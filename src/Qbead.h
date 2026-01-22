@@ -76,6 +76,14 @@ static uint32_t scaleColor(float a, uint32_t c) {
   return color(r, g, b);
 }
 
+static uint32_t scaleColorQuad(float a, uint32_t c) {
+  float a2 = a * a;
+  uint8_t r = min(0xff, a2 * redch(c));
+  uint8_t g = min(0xff, a2 * greench(c));
+  uint8_t b = min(0xff, a2 * bluech(c));
+  return color(r, g, b);
+}
+
 static uint32_t scaleColor_8bit(uint8_t a, uint32_t c) {
   uint8_t r = min(0xff, (int)a * redch(c) / 255);
   uint8_t g = min(0xff, (int)a * greench(c) / 255);
@@ -221,10 +229,16 @@ public:
     );
   }
 
-  float innerProductAbs(const BlochVector& other) const { // TODO this is quite suboptimal
+  // Absolute value of inner product between the quantum states (as kets in a Hilbert space) represented by the two Bloch vectors
+  float innerProductAbs(const BlochVector& other) const { // TODO this is quite suboptimal // maybe rename to innerProductKet
     float angle = centralAngle(other);
     float cosval = cos_deg(angle / 2.0f);
     return cosval;
+  }
+
+  // Inner product between the 3D vectors
+  float innerProductGeom(const BlochVector& other) const { // TODO this is quite suboptimal
+    return x * other.x + y * other.y + z * other.z;
   }
 
   void setXYZ(const float x, const float y, const float z){
@@ -245,6 +259,11 @@ float centralAngle(const BlochVector& v, const BlochVector& u) {
 float innerProductAbs(const BlochVector& v, const BlochVector& u) {
   return v.innerProductAbs(u);
 }
+
+float innerProductGeom(const BlochVector& v, const BlochVector& u) {
+  return v.innerProductGeom(u);
+}
+
 bool checkThetaAndPhi(float theta, float phi) {
   return theta >= 0 && theta <= 180 && phi >= 0 && phi <= 360;
 }
@@ -316,6 +335,7 @@ public:
   float t_acc, p_acc;        // theta and phi according to gravity
   float T_imu;               // last update from the IMU
   bool tapped = false;
+  bool tappedrecorded = false;
 
   float t_ble, p_ble; // theta and phi as sent over BLE connection
   uint32_t c_ble = 0xffffff; // color as sent over BLE connection
@@ -563,10 +583,12 @@ public:
   }
 
   bool wasTapped(){
+    if (!tappedrecorded) return false;
     // return true if IMU detected a tap since the last time wasTapped() was called
     bool wasTapped = tapped;
     // set tapped to false, so that the next time this function is called, it will return false
     tapped = false;
+    tappedrecorded = false;
     // save tapped location
     if (wasTapped){
       x_whentapped = whentapped_buffer[ix];
@@ -584,17 +606,8 @@ public:
     // Then readout XYZ immediately
     // We could choose to only readout XYZ when we haven't yet processed the last tap,
     // but for now, let's just update the position everytime we tap.
-    singletoninstance->whentapped_buffer[0] = singletoninstance->imu.readFloatAccelX();
-    singletoninstance->whentapped_buffer[1] = singletoninstance->imu.readFloatAccelY();
-    singletoninstance->whentapped_buffer[2] = singletoninstance->imu.readFloatAccelZ();
+    singletoninstance->tappedrecorded = false;
     singletoninstance->tapped = true;
-    for (uint16_t conn_hdl=0; conn_hdl < QB_MAX_PRPH_CONNECTION; conn_hdl++)
-    {
-      if ( Bluefruit.connected(conn_hdl) && singletoninstance->blecharacc.notifyEnabled(conn_hdl) )
-      {
-        singletoninstance->blechartap.notify(singletoninstance->whentapped_buffer, 3*sizeof(float));
-      }
-    }
   }
 
   void readIMU(bool print=true) {
@@ -627,7 +640,23 @@ public:
     p_acc = phi(x, y)*180/3.14159;
     if (p_acc<0) {p_acc+=360;}// to bring it to [0,360] range
 
+    if (!tappedrecorded && tapped) {
+      tappedrecorded = true;
+      whentapped_buffer[0] = imu.readFloatAccelX();
+      whentapped_buffer[1] = imu.readFloatAccelY();
+      whentapped_buffer[2] = imu.readFloatAccelZ();
+      for (uint16_t conn_hdl=0; conn_hdl < QB_MAX_PRPH_CONNECTION; conn_hdl++)
+      {
+        if ( Bluefruit.connected(conn_hdl) && singletoninstance->blecharacc.notifyEnabled(conn_hdl) )
+        {
+          singletoninstance->blechartap.notify(singletoninstance->whentapped_buffer, 3*sizeof(float));
+        }
+      }
+  }
+
     if (print) {
+      Serial.print(tappedrecorded);
+      Serial.print("\t");
       Serial.print(tapped);
       Serial.print("\t");
       Serial.print(x);
