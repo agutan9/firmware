@@ -33,7 +33,8 @@ void loop() {
 
   // Clear the display.
   bead.clear();
-
+  // Read the IMU to get the current gravity direction.
+  bead.readIMU(false);
   if (bead.wasTapped()){
     last_tap = millis();
     BlochVector acc_vector(bead.x_whentapped, bead.y_whentapped, bead.z_whentapped);
