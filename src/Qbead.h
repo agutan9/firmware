@@ -20,8 +20,8 @@
 #define QB_IY 0
 #define QB_IZ 1
 #define QB_SX 0
-#define QB_SY 0
-#define QB_SZ 0
+#define QB_SY 1
+#define QB_SZ 1
 
 // LSM6DS3 filter settings
 #define LSM6DS3_ACC_GYRO_LPF2_XL_EN 0x80
@@ -460,11 +460,11 @@ public:
     leg = nlegs - leg; // invert direction for the phi angle, because the PCB is set up as a left-handed coordinate system
     leg = leg % nlegs;
     if (leg == 0) {
-      pixels.setPixelColor(pixel, color);
+      pixels.setPixelColor(6-pixel, color);
     } else if (pixel == 0) {
-      pixels.setPixelColor(0, color);
-    } else if (pixel == 6) {
       pixels.setPixelColor(6, color);
+    } else if (pixel == 6) {
+      pixels.setPixelColor(0, color);
     } else {
       pixels.setPixelColor(7 + (leg - 1) * (nsections - 1) + pixel - 1, color);
     }
