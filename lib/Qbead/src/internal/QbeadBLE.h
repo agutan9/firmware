@@ -15,7 +15,8 @@ namespace BLEManager
   enum class Role
   {
     Peripheral,
-    Central
+    Central,
+    Dual
   };
 
   class BLEManager
@@ -23,6 +24,37 @@ namespace BLEManager
   private:
     static BLEManager *instance;
     DataPacket lastPacket;
+
+    void setupPeripheral()
+    {
+      bleservice.begin();
+
+      qBeadDataChar.setProperties(
+          CHR_PROPS_READ |
+          CHR_PROPS_NOTIFY);
+
+      qBeadDataChar.setPermission(
+          SECMODE_OPEN,
+          SECMODE_NO_ACCESS);
+
+      qBeadDataChar.setUserDescriptor("Qbead data");
+      qBeadDataChar.setFixedLen(sizeof(DataPacket));
+      qBeadDataChar.begin();
+
+      DataPacket initial = {0, 0};
+      qBeadDataChar.write(&initial, sizeof(initial));
+    }
+
+    void setupCentral()
+    {
+      qBeadClientService.begin();
+
+      qBeadDataClient.setNotifyCallback(data_callback);
+      qBeadDataClient.begin();
+
+      Bluefruit.Central.setConnectCallback(connect_callback);
+      Bluefruit.Central.setDisconnectCallback(disconnect_callback);
+    }
 
   public:
     BLEManager()
@@ -56,24 +88,7 @@ namespace BLEManager
       instance = this;
       Bluefruit.begin(QB_MAX_PRPH_CONNECTION, 0);
       Bluefruit.setName("Qbead Peripheral");
-
-      bleservice.begin();
-
-      qBeadDataChar.setProperties(
-          CHR_PROPS_READ |
-          CHR_PROPS_NOTIFY);
-
-      qBeadDataChar.setPermission(
-          SECMODE_OPEN,
-          SECMODE_NO_ACCESS);
-
-      qBeadDataChar.setUserDescriptor("Qbead data");
-      qBeadDataChar.setFixedLen(sizeof(DataPacket));
-      qBeadDataChar.begin();
-
-      DataPacket initial = {0, 0};
-      qBeadDataChar.write(&initial, sizeof(initial));
-
+      setupPeripheral();
       startBLEadv();
     }
 
@@ -113,14 +128,22 @@ namespace BLEManager
       Bluefruit.begin(0, 1);
       Bluefruit.setName("Qbead Central");
 
-      qBeadClientService.begin();
+      setupCentral();
 
-      qBeadDataClient.setNotifyCallback(data_callback);
-      qBeadDataClient.begin();
+      startBLEScan();
+    }
 
-      Bluefruit.Central.setConnectCallback(connect_callback);
-      Bluefruit.Central.setDisconnectCallback(disconnect_callback);
+    void beginDualRole()
+    {
+      instance = this;
 
+      Bluefruit.begin(1, 1);
+      Bluefruit.setName("Qbead Dual");
+
+      setupPeripheral();
+      setupCentral();
+
+      startBLEadv();
       startBLEScan();
     }
 
