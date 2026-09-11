@@ -17,7 +17,7 @@ namespace Qbead
   class Qbead
   {
   public:
-    Qbead(BLEManager::Role role = BLEManager::Role::Peripheral,
+    Qbead(BLEManager::Role role = BLEManager::Role::Dual,
           const uint16_t pin00 = QB_LEDPIN,
           const uint16_t pixelconfig = QB_PIXELCONFIG,
           const uint16_t nsections = QB_NSECTIONS,
@@ -140,9 +140,13 @@ namespace Qbead
       {
         ble.beginPeripheral();
       }
-      else
+      else if (role == BLEManager::Role::Central)
       {
         ble.beginCentral();
+      }
+      else
+      {
+        ble.beginDualRole();
       }
     }
 
