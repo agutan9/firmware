@@ -1,11 +1,9 @@
-// Tap Receiver: flash red when the sender Qbead is tapped.
-
 #include <Qbead.h>
 #include <QbeadUtils.h>
 
 using namespace Qbead;
 
-Qbead::Qbead bead(BLEManager::Role::Central);
+Qbead::Qbead bead(BLEManager::Role::Dual);
 
 uint32_t red = color(255, 0, 0);
 
