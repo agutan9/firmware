@@ -14,6 +14,14 @@
 namespace Qbead
 {
 
+  enum class CommandType : uint8_t
+  {
+    None = 0,            // Reserved: no packet / empty packet buffer.
+    SetOrchestrator = 1, // Set or announce the entanglement orchestrator.
+    Bell0 = 2,           // Request Bell state (|00> + |11>) / sqrt(2).
+    Bell1 = 3            // Request Bell state (|01> + |10>) / sqrt(2).
+  };
+
   class Qbead
   {
   public:
@@ -47,6 +55,7 @@ namespace Qbead
     Adafruit_NeoPixel pixels;
     BLEManager::BLEManager ble;
     BLEManager::Role role;
+    uint8_t isOrchastratorSet = 0; // 0 no, 1 yes I am, 2 yes but its not me
 
     const uint8_t nsections;
     const uint8_t nlegs;
@@ -313,6 +322,16 @@ namespace Qbead
       return packet.type == 1 && packet.value == 1;
     }
 
+    BLEManager::DataPacket takeLatestPacket()
+    {
+      BLEManager::DataPacket packet;
+      if (!ble.takePacket(packet))
+      {
+        return {0, 0};
+      }
+      return packet;
+    }
+
     static void tap_isr()
     {
       // This function is called when the IMU triggers an interrupt. That is: when a tap is detected!
@@ -396,6 +415,21 @@ namespace Qbead
       rbuffer[0] = x;
       rbuffer[1] = y;
       rbuffer[2] = z;
+    }
+
+    void orchastrate()
+    {
+      if (isOrchastratorSet)
+      {
+        return;
+      }
+      isOrchastratorSet = 1;
+      ble.sendData(static_cast<uint8_t>(CommandType::SetOrchestrator), 2); // set me orchastrator
+    }
+
+    void setOrchestrate(uint8_t newValue)
+    {
+      isOrchastratorSet = newValue;
     }
   }; // end class
 
