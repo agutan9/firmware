@@ -5,9 +5,12 @@
 #include <bluefruit.h>
 #include <Qbead.h>
 
+const int numPixels;
+
 Qbead::Qbead bead;
 
 struct PixelAxis;
+// TODO IF ALLOWED TO HARDCODE MAKE static constexpr
 std::vector<PixelAxis> pixelLUT;
 
 void calcPixelUnitVecs();
@@ -19,21 +22,21 @@ void setup() {
   // Skip bead.begin() entirely for now. This is just for visualising the leds
   bead.pixels.begin();
   bead.pixels.setBrightness(50);
-  // Dynamically set LUT size based on device specs
-  const int numPixels = bead.
-  PixelAxis pixelLUT
+  // Dynamically set LUT size based on device specs and fill it
+  numPixels = bead.pixels.numPixels();
+  pixelLUT.resize(numPixels);
+  initPixelLUT(bead);
 
-  for (int i = 0; i < bead.pixels.numPixels(); i++) {
-    bead.pixels.setPixelColor(i, bead.pixels.Color(LVL, LVL, LVL));
-  }
-  bead.pixels.show();
+
 }
 
 void loop() {
-  //// Re-assert periodically in case of any driver hiccup; keeps draw constant.
-  //for (int i = 0; i < bead.pixels.numPixels(); i++) {
-  //  bead.pixels.setPixelColor(i, bead.pixels.Color(LVL, LVL, LVL));
-  //}
+      // TODO: CHECK IF 0 and 6 are not acidentally swapped
+    // TODO: DO THIS BY GOING THROUGH ALL LEDS WITH PIXEL ON OFF WITH DELAY
+  for (int i = 0; i < numPixels; i++) {
+    bead.pixels.setPixelColor(i, bead.pixels.Color(LVL, LVL, LVL));
+  }
+  bead.pixels.show();
   Serial.println("Looping..")
   bead.pixels.show();
   delay(5000);
@@ -44,32 +47,37 @@ struct PixelAxis {
 };
 
 
-
-// TODO IF ALLOWED TO HARDCODE MAKE static constexpr
-
-    // z = cos(t)
-    // x = cos(p)sin(t)
-    // y = sin(p)sin(t)
 // TODO: Could use a hardcoded LU. Perhaps with a check if the assumed tot# of pixels is still the same(?)
 // Codestyle question 
-void calcPixelUnitVecs(const Qbead &bead)
+void initPixelLUT(const Qbead &bead)
 {
-    // Do the poles seperately
-    // ...
-    // Do the rest
+    // Trivial: Do the poles seperately
+    // Northpole aligned with +Z unit vector
+    pixelLUT[0] = {0.0, 0.0,  1.0}
+    // Southpole aligned with -Z unit vector
+    pixelLUT[6] = {0.0, 0.0, -1.0}
+    // Non-trivial: All the unique-per-leg pixels
     float band_theta = bead.theta_quant;
+    int p_i = 1; // skip pole at 0
     for (int th_i = 0; th_i < bead.nsections - 1; th_i++)
     {
+        float band_cost = cos_deg(band_theta);
+        float band_sint = sin_deg(band_theta);
         float cum_phi = 0;
         for (int ph_j = 0; ph_j < bead.nlegs; ph_j++)
         {
-
+            pixelLUT[p_i] = {
+                cos_deg(cum_phi) * band_sint,// X = cos(p)sin(t)
+                sin_deg(cum_phi) * band_sint,// Y = sin(p)sin(t)
+                band_cost                    // Z = cos(theta)
+            }
             // Go to the next leg's pixel at same height
             cum_phi += bead.phi_quant;
         }
         band_theta += bead.theta_quant;
+        // Need to skip  p_i = 6 as it's a pole
+        p_i = ++p_i == 6 ? p_i++ : p_i; 
     }
-
 }
 
 void axisBands(Qbead &bead)
