@@ -2,7 +2,11 @@
 //
 
 // First, let's include the Qbead library and set up a few useful data structures.
+#include <BlochVector.h>
+#include <QbeadUtils.h>
 #include <Qbead.h>
+
+using namespace Qbead;
 
 Qbead::Qbead bead;
 
