@@ -8,7 +8,6 @@
 
 Qbead::Qbead bead;
 
-// TEST
 
 // put function declarations here:
 //int myFunction(int, int);
