@@ -7,9 +7,9 @@
 #include <math.h>
 #include <bluefruit.h>
 
-#include "BlochVector.h"
-#include "QbeadUtils.h"
-#include "QbeadBLE.h"
+#include "internal/BlochVector.h"
+#include "internal/QbeadUtils.h"
+#include "internal/QbeadBLE.h"
 
 namespace Qbead
 {
