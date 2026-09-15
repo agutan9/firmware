@@ -21,7 +21,7 @@ void setup() {
 }
 
 void loop() {
-  bead.readIMU(false);
+  bead.readIMU(true);
   bead.clear();
   bead.setBloch_deg_smooth(bead.t_ble, bead.p_ble, bead.c_ble);
   bead.show();
@@ -32,3 +32,4 @@ void loop() {
 //int myFunction(int x, int y) {
 //  return x + y;
 //}
+

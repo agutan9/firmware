@@ -129,18 +129,37 @@ namespace Qbead
       Serial.println("Enabled IMU interrupt!");
     }
 
+    // Should use IMU specific reset pin
+    bool resetIMU(LSM6DS3 &imu) {
+      // CTRL3_C = 0x12, SW_RESET = bit 0
+      uint8_t ctrl3c;
+      if (imu.readRegister(&ctrl3c, LSM6DS3_ACC_GYRO_CTRL3_C) != IMU_SUCCESS) return false;
+      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL3_C, ctrl3c | 0x01);
+      delay(1);  // datasheet: reset completes within ~50us, self-clears
+      return imu.begin() == IMU_SUCCESS;
+    }
+
     void begin()
     {
       singletoninstance = this;
       Serial.begin(9600);
-      while (!Serial)
-        ; // TODO some form of warning or a way to give up if Serial never becomes available
+      //while (!Serial)
+      //  ; // TODO some form of warning or a way to give up if Serial never becomes available
+      unsigned long t0 = millis();
+      while (!Serial && millis() - t0 < 15000) { ; }
 
       pixels.begin();
       clear();
       setBrightness(10);
 
       Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
+      // Attempt to force reset the IMU before init.. Needs I2C bus to work
+      //if (!resetIMU(imu))
+      //{ // Force Deep Sleep reset
+      //  Serial.println("[WARN] IMU soft-reset failed, forcing SYSTEMOFF...");
+      //  delay(50); // give the UART time to flush before core powers down
+      //  goToSystemOff();
+      //}
       if (!imu.begin())
       {
         Serial.println("[DEBUG]{IMU} IMU initialized correctly");
