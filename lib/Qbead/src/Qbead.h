@@ -153,14 +153,9 @@ namespace Qbead
       setBrightness(10);
 
       Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
+      //if (!imu.begin()) // TODO resetIMU(imu) instead?
       // Attempt to force reset the IMU before init.. Needs I2C bus to work
-      //if (!resetIMU(imu))
-      //{ // Force Deep Sleep reset
-      //  Serial.println("[WARN] IMU soft-reset failed, forcing SYSTEMOFF...");
-      //  delay(50); // give the UART time to flush before core powers down
-      //  goToSystemOff();
-      //}
-      if (!imu.begin())
+      if (!resetIMU(imu)) // TODO revert back?
       {
         Serial.println("[DEBUG]{IMU} IMU initialized correctly");
       }
