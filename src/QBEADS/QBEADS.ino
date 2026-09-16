@@ -32,24 +32,8 @@ uint32_t mapRedBlackGreenDiscontinuous(float geomInProd);
 uint32_t getContourColour(float geomInProd);
 void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
 
-// TODO: Resolve inverse polarity issue (currently I think because everything is flipped RED maps to -Z not +Z)
-// --- Sweep candidate lists -------------------------------------------
-// idx0-idx2 "val" candidates (idx3/idx4 stay at their original table value
-// as fixed anchors so you always have a stable bright reference on-sphere).
-static const uint8_t valCandidates[] = { 15, 20, 25, 31, 45, 60, 90, 120 };
-static const uint8_t NUM_VAL = sizeof(valCandidates) / sizeof(valCandidates[0]);
+bool gammaToggle = true;
 
-// Global saturation candidates (applied to all 5 bands equally this round;
-// split into per-band arrays later if you want independent control).
-static const uint8_t satCandidates[] = { 255, 180, 90, 60 };
-static const uint8_t NUM_SAT = sizeof(satCandidates) / sizeof(satCandidates[0]);
-
-static uint8_t valStep = 0;
-static uint8_t satStep = 0;
-
-uint8_t gammaLUT[256];
-bool gammaToggle = false;
-// --- Sweep
 
 void setup() {
     Serial.begin(9600);
@@ -67,81 +51,21 @@ void setup() {
     test_rot_axis.setXYZ(0.0f, 1.0f, 0.0f);
     bead.clear();
 
-    // Color Fine tuning
-    buildGammaTable(gammaLUT, 2.8f);   // start steeper than default 2.8
+
 }
+// TODO: Resolve inverse polarity issue (currently I think because everything is flipped RED maps to -Z not +Z)
+
+// TODO: Maybe add pulsation? The ParabolaWave from Qbead.h is pretty hectic so NeoPixel sine might just be better
+// TODO: Fine-tune the Brightness vs gamma (use our own custom gamma table / func for different gammas)
 
 void loop() {  
     delay(100);
-    //state.rotateAround(test_rot_axis, 1.5f);
+    state.rotateAround(test_rot_axis, 1.5f);
     bead.clear(); // Redundant? as we write to all pixels
-// Pulsate
-    // TODO: WIP -> Maybe just use the innante NeoPixel sine func?
-    //const uint8_t period = 5000;
-    //uint32_t t = millis() % period;
-    //uint8_t x = (uint8_t)((t * 255UL) / period);
-    //uint8_t wave = Qbead::parabolaWave(x);
-    //uint8_t brightness = (uint8_t)((wave * 20UL) / 252);
-    //brightness = min((uint8_t)5, brightness); // never fully off, adjust min as desired
-    //bead.pixels.setBrightness(brightness);
   
     setContourBands(bead, state);
     bead.pixels.show();
-    //Serial.println("Contour axis changed by 3.5f.."); // TODO: REMOVE
-
-    delay(3000);
-    gammaToggle = gammaToggle ? false : true;
-
-    //// Color finetuning
-    //uint8_t testVal = valCandidates[valStep];
-    //uint8_t testSat = satCandidates[satStep];
-    ////bead.clear();
-    //for (int i = 4; i >= 0; i--) {
-    //    HSVBand b = redBandsHSV[i];   // copy so the source table stays untouched
-//
-    //    // Only override val on the low, hard-to-see bands (idx0-idx2).
-    //    // idx3/idx4 keep their original val as a fixed bright anchor.
-    //    if (i <= 2) {
-    //        b.val = testVal;
-    //    }
-    //    b.sat = testSat;
-//
-    //    uint32_t raw = Adafruit_NeoPixel::ColorHSV(b.hue, b.sat, b.val);
-    //    uint32_t corrected = 0;
-    //    if (gammaToggle)
-    //    {
-    //        uint8_t r = gammaLUT[(raw >> 16) & 0xFF];
-    //        uint8_t g = gammaLUT[(raw >> 8) & 0xFF];
-    //        uint8_t bch = gammaLUT[raw & 0xFF];
-    //        corrected = ((uint32_t)r << 16) | ((uint32_t)g << 8) | bch;
-    //    }
-    //    else 
-    //    {
-    //        corrected = raw;
-    //    }
-//
-//
-    //    bead.pixels.setPixelColor(i, corrected);
-    //}
-    //bead.pixels.show();
-//
-    //// Print what's currently on the sphere so you can log the combo that
-    //// looked best without having to guess from memory afterwards.
-    //Serial.print("valStep=");   Serial.print(valStep);
-    //Serial.print(" testVal=");  Serial.print(testVal);
-    //Serial.print("  satStep="); Serial.print(satStep);
-    //Serial.print(" testSat=");  Serial.println(testSat);
-//
-    //delay(3500);
-    //// --- Advance counters: sat cycles fully before val advances ---
-    //satStep++;
-    //if (satStep >= NUM_SAT) {
-    //    satStep = 0;
-    //    valStep++;
-    //    if (valStep >= NUM_VAL) {
-    //        valStep = 0;   // wrap around and repeat the whole grid
-    //    }
-    //}
+    //Serial.println("Contour axis changed by 3.5f..");
 }
 
 // TODO: Could use a hardcoded LU. Perhaps with a check if the assumed tot# of pixels is still the same(?)
@@ -319,15 +243,10 @@ void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
             pixelLUT[p_i].y * arbAxis.y +
             pixelLUT[p_i].z * arbAxis.z
             // in-product with pixel's basis unit vecs
-            , false
+            , gammaToggle
         ));
     }
 }
-
-
-//SECTION - 
-
-
 
 
 //SECTION Testing and Utility

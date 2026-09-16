@@ -95,6 +95,23 @@ static constexpr HSVBand correlationVioletMagentaBands[5] = {
 // sweeps) to confirm hue separation holds up under real multi-bead
 // shell-mixing conditions, since that's the actual operating scenario.
 
+// --- Sweep candidate lists -------------------------------------------
+// idx0-idx2 "val" candidates (idx3/idx4 stay at their original table value
+// as fixed anchors so you always have a stable bright reference on-sphere).
+static const uint8_t valCandidates[] = { 15, 20, 25, 31, 45, 60, 90, 120 };
+static const uint8_t NUM_VAL = sizeof(valCandidates) / sizeof(valCandidates[0]);
+
+// Global saturation candidates (applied to all 5 bands equally this round;
+// split into per-band arrays later if you want independent control).
+static const uint8_t satCandidates[] = { 255, 180, 90, 60 };
+static const uint8_t NUM_SAT = sizeof(satCandidates) / sizeof(satCandidates[0]);
+
+static uint8_t valStep = 0;
+static uint8_t satStep = 0;
+
+uint8_t gammaLUT[256];
+bool gammaToggle = true;
+// --- Sweep
 
 
 
@@ -114,9 +131,11 @@ void setup() {
     Serial.begin(9600);
     bead.pixels.begin();
     bead.pixels.setBrightness(255);   // matches your current test condition
-    // No gamma correction applied in this sketch, deliberately.
-}
 
+    // Color Fine tuning
+    buildGammaTable(gammaLUT, 2.8f);   // start steeper than default 2.8
+}
+// USE THIS FOR INSPECTING NEW COLOR MAPS
 void loop(){
     for (int i = 0; i < 5; i++) {
         const HSVBand &band1 = redYellowBands[i];   // or any of the 4 tables
@@ -183,6 +202,7 @@ void loop(){
     delay(1000);
 }
 
+// USE THIS FOR SINGLE PARAMETER SWEEPS
 //void loop() {
 //    uint16_t testHue = hueCandidates[hueStep];
 //    //uint32_t raw = Adafruit_NeoPixel::ColorHSV(FIXED_HUE, testSat, FIXED_VAL);
@@ -213,6 +233,64 @@ void loop(){
 //    if (hueStep >= NUM_HUE) {
 //        hueStep = 0;
 //    }
+//}
+
+// USE THIS FOR MULTI-PARAMETER GAMUT SWEEPING
+//void loop()
+//{
+//    //delay(3000);
+//    //gammaToggle = gammaToggle ? false : true;
+//
+//    //// Color finetuning
+//    //uint8_t testVal = valCandidates[valStep];
+//    //uint8_t testSat = satCandidates[satStep];
+//    ////bead.clear();
+//    //for (int i = 4; i >= 0; i--) {
+//    //    HSVBand b = redBandsHSV[i];   // copy so the source table stays untouched
+////
+//    //    // Only override val on the low, hard-to-see bands (idx0-idx2).
+//    //    // idx3/idx4 keep their original val as a fixed bright anchor.
+//    //    if (i <= 2) {
+//    //        b.val = testVal;
+//    //    }
+//    //    b.sat = testSat;
+////
+//    //    uint32_t raw = Adafruit_NeoPixel::ColorHSV(b.hue, b.sat, b.val);
+//    //    uint32_t corrected = 0;
+//    //    if (gammaToggle)
+//    //    {
+//    //        uint8_t r = gammaLUT[(raw >> 16) & 0xFF];
+//    //        uint8_t g = gammaLUT[(raw >> 8) & 0xFF];
+//    //        uint8_t bch = gammaLUT[raw & 0xFF];
+//    //        corrected = ((uint32_t)r << 16) | ((uint32_t)g << 8) | bch;
+//    //    }
+//    //    else 
+//    //    {
+//    //        corrected = raw;
+//    //    }
+////
+////
+//    //    bead.pixels.setPixelColor(i, corrected);
+//    //}
+//    //bead.pixels.show();
+////
+//    //// Print what's currently on the sphere so you can log the combo that
+//    //// looked best without having to guess from memory afterwards.
+//    //Serial.print("valStep=");   Serial.print(valStep);
+//    //Serial.print(" testVal=");  Serial.print(testVal);
+//    //Serial.print("  satStep="); Serial.print(satStep);
+//    //Serial.print(" testSat=");  Serial.println(testSat);
+////
+//    //delay(3500);
+//    //// --- Advance counters: sat cycles fully before val advances ---
+//    //satStep++;
+//    //if (satStep >= NUM_SAT) {
+//    //    satStep = 0;
+//    //    valStep++;
+//    //    if (valStep >= NUM_VAL) {
+//    //        valStep = 0;   // wrap around and repeat the whole grid
+//    //    }
+//    //}
 //}
 
 // -----------------------------------------------------------------------
