@@ -2,6 +2,8 @@
 
 ## Installation
 
+## Arduino-IDE
+
 ### Required board files
 Add the following links to Arduino IDE => Preferences => Additional boards manager URLs.
 
@@ -18,6 +20,17 @@ Add the following packages to Arduino IDE => Library Manager:
 - Seeed Arduino LSM6DS3
 
 The `src` of this firmware also needs to be added as an Arduino library. This can be done two ways. The first option is to compress the `src` folder to a `.zip` file and then add it in Arduino IDE => sketch => Include library => Add .ZIP library. The second option is to create a symlink between the `src` folder and the Arduino library folder.
+
+## PlatformIO VS-Code + Arduino-DE
+How to link Arduino-IDE to platformIO repo?
+You need to create 2 symlinks to your Arduino Sketches folder; see IDE/preferences for location if unsure. The following example commands work in both Windows & Linux. Two shorthands will be used:
+PIO_REPO: This is the root dir of your git repo (and thus also the platformIO proj-dir)
+A_IDE_SKLOC: This is the root dir for all Arduino-IDE sketches. Note: Ideally, (re)name this folder without spaces as that could cause weird indexing errors (on Windows at least)
+INO_NAME: Arduino-IDE has the weird constraint that a project’s .ino file must have the same name as the project dir. Thus, the sketch project dir acting as the symlink must have the same name as how the main .ino file in the repo/src is named
+Source: For access to the core entry-point .ino sketch files. Note: need to use /src/ not /src
+Ex. $ ln -s “PIO_REPO/src/” “A_IDE_SKLOC/INO_NAME”
+Private Library: The core Qbead firmware files need to be added as private libraries
+Ex. $ ln -s "/PIO_REPO/lib/Qbead" “A_IDE_SKLOC/Libraries/Qbead”
 
 
 ## Contribution guidelines

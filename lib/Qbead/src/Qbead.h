@@ -7,9 +7,9 @@
 #include <math.h>
 #include <bluefruit.h>
 
-#include "BlochVector.h"
-#include "QbeadUtils.h"
-#include "QbeadBLE.h"
+#include "internal/BlochVector.h"
+#include "internal/QbeadUtils.h"
+#include "internal/QbeadBLE.h"
 
 namespace Qbead
 {
@@ -129,19 +129,33 @@ namespace Qbead
       Serial.println("Enabled IMU interrupt!");
     }
 
+    // Should use IMU specific reset pin
+    bool resetIMU(LSM6DS3 &imu) {
+      // CTRL3_C = 0x12, SW_RESET = bit 0
+      uint8_t ctrl3c;
+      if (imu.readRegister(&ctrl3c, LSM6DS3_ACC_GYRO_CTRL3_C) != IMU_SUCCESS) return false;
+      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL3_C, ctrl3c | 0x01);
+      delay(1);  // datasheet: reset completes within ~50us, self-clears
+      return imu.begin() == IMU_SUCCESS;
+    }
+
     void begin()
     {
       singletoninstance = this;
       Serial.begin(9600);
-      while (!Serial)
-        ; // TODO some form of warning or a way to give up if Serial never becomes available
+      //while (!Serial)
+      //  ; // TODO some form of warning or a way to give up if Serial never becomes available
+      unsigned long t0 = millis();
+      while (!Serial && millis() - t0 < 15000) { ; }
 
       pixels.begin();
       clear();
       setBrightness(10);
 
       Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
-      if (!imu.begin())
+      //if (!imu.begin()) // TODO resetIMU(imu) instead?
+      // Attempt to force reset the IMU before init.. Needs I2C bus to work
+      if (!resetIMU(imu)) // TODO revert back?
       {
         Serial.println("[DEBUG]{IMU} IMU initialized correctly");
       }
