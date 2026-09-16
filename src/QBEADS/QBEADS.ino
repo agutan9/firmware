@@ -5,6 +5,8 @@
 #include <bluefruit.h>
 #include <Qbead.h>
 
+#include "color_tools.h"
+
 //#define VERBOSE
 
 #define NORTH_POLE_IDX 0
@@ -24,46 +26,122 @@ struct PixelAxis {
 // TODO IF ALLOWED TO HARDCODE MAKE static constexpr
 PixelAxis pixelLUT[NUM_PIXELS];
 
+// TODO: Remove or rectify
 void initPixelLUT(const Qbead::Qbead &bead);
-uint32_t mapRedBlackGreen(uint8_t colorVal);
+uint32_t mapRedBlackGreenDiscontinuous(float geomInProd);
 uint32_t getContourColour(float geomInProd);
 void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
 
 // TODO: Resolve inverse polarity issue (currently I think because everything is flipped RED maps to -Z not +Z)
+// --- Sweep candidate lists -------------------------------------------
+// idx0-idx2 "val" candidates (idx3/idx4 stay at their original table value
+// as fixed anchors so you always have a stable bright reference on-sphere).
+static const uint8_t valCandidates[] = { 15, 20, 25, 31, 45, 60, 90, 120 };
+static const uint8_t NUM_VAL = sizeof(valCandidates) / sizeof(valCandidates[0]);
+
+// Global saturation candidates (applied to all 5 bands equally this round;
+// split into per-band arrays later if you want independent control).
+static const uint8_t satCandidates[] = { 255, 180, 90, 60 };
+static const uint8_t NUM_SAT = sizeof(satCandidates) / sizeof(satCandidates[0]);
+
+static uint8_t valStep = 0;
+static uint8_t satStep = 0;
+
+uint8_t gammaLUT[256];
+bool gammaToggle = false;
+// --- Sweep
 
 void setup() {
-  Serial.begin(9600);
-  delay(50);
-  // IMU Might not initialize but should fail silently letting us test the LED
-  bead.begin();
-  bead.pixels.setBrightness(10); // Per documentation this was only inteded for one-time setup usage
-  initPixelLUT(bead);
-  bead.testPixels();
-  delay(50);
-  setContourBands(bead, state);
-  bead.pixels.show();
-  delay(100);
-  // Use to fake IMU axis
-  test_rot_axis.setXYZ(0.0f, 1.0f, 0.0f);
+    Serial.begin(9600);
+    delay(50);
+    // IMU Might not initialize but should fail silently letting us test the LED
+    bead.begin();
+    bead.pixels.setBrightness(255); // Per documentation this was only inteded for one-time setup usage
+    initPixelLUT(bead);
+    bead.testPixels();
+    delay(50);
+    setContourBands(bead, state);
+    bead.pixels.show();
+    delay(100);
+    // Use to fake IMU axis
+    test_rot_axis.setXYZ(0.0f, 1.0f, 0.0f);
+    bead.clear();
+
+    // Color Fine tuning
+    buildGammaTable(gammaLUT, 2.8f);   // start steeper than default 2.8
 }
 
 void loop() {  
-  delay(100);
-  //state.rotateAround(test_rot_axis, 1.5f);
-  bead.clear(); // Redundant? as we write to all pixels
-  // Pulsate
-  // TODO: WIP -> Maybe just use the innante NeoPixel sine func?
-  //const uint8_t period = 5000;
-  //uint32_t t = millis() % period;
-  //uint8_t x = (uint8_t)((t * 255UL) / period);
-  //uint8_t wave = Qbead::parabolaWave(x);
-  //uint8_t brightness = (uint8_t)((wave * 20UL) / 252);
-  //brightness = min((uint8_t)5, brightness); // never fully off, adjust min as desired
-  //bead.pixels.setBrightness(brightness);
-  //
-  setContourBands(bead, state);
-  bead.pixels.show();
-  //Serial.println("Contour axis changed by 3.5f.."); // TODO: REMOVE
+    delay(100);
+    //state.rotateAround(test_rot_axis, 1.5f);
+    bead.clear(); // Redundant? as we write to all pixels
+// Pulsate
+    // TODO: WIP -> Maybe just use the innante NeoPixel sine func?
+    //const uint8_t period = 5000;
+    //uint32_t t = millis() % period;
+    //uint8_t x = (uint8_t)((t * 255UL) / period);
+    //uint8_t wave = Qbead::parabolaWave(x);
+    //uint8_t brightness = (uint8_t)((wave * 20UL) / 252);
+    //brightness = min((uint8_t)5, brightness); // never fully off, adjust min as desired
+    //bead.pixels.setBrightness(brightness);
+  
+    setContourBands(bead, state);
+    bead.pixels.show();
+    //Serial.println("Contour axis changed by 3.5f.."); // TODO: REMOVE
+
+    delay(3000);
+    gammaToggle = gammaToggle ? false : true;
+
+    //// Color finetuning
+    //uint8_t testVal = valCandidates[valStep];
+    //uint8_t testSat = satCandidates[satStep];
+    ////bead.clear();
+    //for (int i = 4; i >= 0; i--) {
+    //    HSVBand b = redBandsHSV[i];   // copy so the source table stays untouched
+//
+    //    // Only override val on the low, hard-to-see bands (idx0-idx2).
+    //    // idx3/idx4 keep their original val as a fixed bright anchor.
+    //    if (i <= 2) {
+    //        b.val = testVal;
+    //    }
+    //    b.sat = testSat;
+//
+    //    uint32_t raw = Adafruit_NeoPixel::ColorHSV(b.hue, b.sat, b.val);
+    //    uint32_t corrected = 0;
+    //    if (gammaToggle)
+    //    {
+    //        uint8_t r = gammaLUT[(raw >> 16) & 0xFF];
+    //        uint8_t g = gammaLUT[(raw >> 8) & 0xFF];
+    //        uint8_t bch = gammaLUT[raw & 0xFF];
+    //        corrected = ((uint32_t)r << 16) | ((uint32_t)g << 8) | bch;
+    //    }
+    //    else 
+    //    {
+    //        corrected = raw;
+    //    }
+//
+//
+    //    bead.pixels.setPixelColor(i, corrected);
+    //}
+    //bead.pixels.show();
+//
+    //// Print what's currently on the sphere so you can log the combo that
+    //// looked best without having to guess from memory afterwards.
+    //Serial.print("valStep=");   Serial.print(valStep);
+    //Serial.print(" testVal=");  Serial.print(testVal);
+    //Serial.print("  satStep="); Serial.print(satStep);
+    //Serial.print(" testSat=");  Serial.println(testSat);
+//
+    //delay(3500);
+    //// --- Advance counters: sat cycles fully before val advances ---
+    //satStep++;
+    //if (satStep >= NUM_SAT) {
+    //    satStep = 0;
+    //    valStep++;
+    //    if (valStep >= NUM_VAL) {
+    //        valStep = 0;   // wrap around and repeat the whole grid
+    //    }
+    //}
 }
 
 // TODO: Could use a hardcoded LU. Perhaps with a check if the assumed tot# of pixels is still the same(?)
@@ -149,25 +227,41 @@ void initPixelLUT(const Qbead::Qbead &bead)
 // Discontinuous red-green-black map, e.g. 5 bands each side (tune counts/colors to taste)
 uint32_t mapRedBlackGreenDiscontinuous(float geomInProd)
 {
-    static constexpr uint32_t redBands[4]   = { 0x00000, 0x160609, 0x660005, 0xFF0505 }; // 0, 0.5, 0.87, 1.0
-    static constexpr uint32_t greenBands[4] = { 0x00000, 0x061609, 0x006605, 0x05FF05 };
-    //static constexpr uint32_t redBands[4]   = { 0x00000, 0x660000, 0xAA0000, 0xFF0000 }; // 0, 0.5, 0.87, 1.0
-    //static constexpr uint32_t greenBands[4] = { 0x00000, 0x006600, 0x00AA00, 0x00FF00 };
+    // Contrast steps: 0, 20, 80, 160, 255
+    // Pure Single Channel w/ manual Gamma correct
+    //static constexpr uint32_t redBands[5]   = { 0x00000, 0x140000, 0x500000, 0xA00000, 0xFF0000 };
+    //static constexpr uint32_t greenBands[5] = { 0x00000, 0x001400, 0x005000, 0x00A000, 0x00FF00 };
+    // Manual Gamma correct + Muddle attempt
+    //static constexpr uint32_t redBands[5]   = { 0x00000, 0x140502, 0x501004, 0xA20008, 0xFF0000 };
+    //static constexpr uint32_t greenBands[5] = { 0x00000, 0x051402, 0x105004, 0x20A008, 0x00FF00 };
+    // HSL -> Blue shift
+    //static constexpr uint32_t redBands[5]   = { 0x00001F, 0x3D0052, 0x8F006B, 0xCC0033, 0xFF0000 }; // idx0: near-black blue -> idx4: pure red
+    //static constexpr uint32_t greenBands[5] = { 0x00001F, 0x002952, 0x008F8F, 0x00CC66, 0x00FF00 }; // idx0: near-black blue (same as red's) -> idx4: pure green
+    
+    // Using color tools for tuning
+
+
 
     float mag = geomInProd;
     if (geomInProd <= 0) mag *= -1;
     int idx = 0.0f;
-    if (mag < 0.25f) idx = 0;        // ~0.0
-    else if (mag < 0.7f) idx = 1;    // ~0.5
-    else if (mag < 0.95f) idx = 2;   // ~0.87
-    else idx = 3;                    // ~1.0
+    if (mag < 0.05f) idx = 0;        // ~0.0 (orthogonal to axis)
+    else if (mag < 0.25f) idx = 1;   // ~0.13 (small angle off orthognal)
+    else if (mag < 0.7f) idx = 2;    // ~0.50 (45deg)
+    else if (mag < 0.95f) idx = 3;   // ~0.87 (smal angle off parallel)
+    else idx = 4;                    // ~1.00 (parallel to axis)
 #ifdef VERBOSE
     Serial.printf("In Prod[%.2f] gives mag: %.2f and idx: %d\n", geomInProd, mag, idx);
 #endif
-    return (geomInProd >= 0.0f) ? redBands[idx] : greenBands[idx];
+    //return (geomInProd >= 0.0f) ? redBands[idx] : greenBands[idx];
+    // TODO: reverse order
+    uint8_t rev_idx = 4 - idx;
+    HSVBand band_HSV = (geomInProd >= 0.0f) ? redYellowBands[rev_idx] : greenYellowBands[rev_idx];
+    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
 }
 
-uint32_t mapRedBlackGreen(uint8_t colorVal)
+// TODO: Currently archaic and continuous
+uint32_t mapRedBlackGreenContinuous(uint8_t colorVal)
 { 
     // 0 = full green, 128 = black, 255 = full red
     if (colorVal < 128)
@@ -181,8 +275,6 @@ uint32_t mapRedBlackGreen(uint8_t colorVal)
         return Adafruit_NeoPixel::Color(r, 0, 0);
     }
 }
-
-
 
 // TODO: If decide the colour maps should take input 0..255
 // refactor them for that and you will need this to convert your InProds
@@ -218,24 +310,27 @@ void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
         y = pixelLUT[p_i].y * arbAxis.y;
         z = pixelLUT[p_i].z * arbAxis.z;
         sum = x + y + z;
-        //Serial.printf("Pixel ID[%d] InProd: {X:%.2f, Y:%.2f, Z:%.2f} Sum: %.2f\n", p_i, x, y, z, sum);
+#ifdef VERBOSE
+        Serial.printf("Pixel ID[%d] InProd: {X:%.2f, Y:%.2f, Z:%.2f} Sum: %.2f\n", p_i, x, y, z, sum);
+#endif
 
-        // OLD PIPELINE WITH in prod to 0..255 range
-        //bead.pixels.setPixelColor(p_i, getContourColour(
-        //    pixelLUT[p_i].x * arbAxis.x +
-        //    pixelLUT[p_i].y * arbAxis.y +
-        //    pixelLUT[p_i].z * arbAxis.z
-        //    // in-product with pixel's basis unit vecs
-        //));
-        bead.pixels.setPixelColor(p_i, mapRedBlackGreenDiscontinuous(
+        bead.pixels.setPixelColor(p_i, getContourColour(
             pixelLUT[p_i].x * arbAxis.x +
             pixelLUT[p_i].y * arbAxis.y +
             pixelLUT[p_i].z * arbAxis.z
             // in-product with pixel's basis unit vecs
+            , false
         ));
     }
 }
 
+
+//SECTION - 
+
+
+
+
+//SECTION Testing and Utility
 // TODO: Remove and maybe add to Utils?
 void showPixelIdsOneByOne(Qbead::Qbead &bead, uint8_t waitTime, uint8_t lastID)
 {
@@ -252,6 +347,7 @@ void showPixelIdsOneByOne(Qbead::Qbead &bead, uint8_t waitTime, uint8_t lastID)
     counter++;
   }
 }
+//!SECTION
 
  // QBEADS is visualised in discretized contour bands around the BlochV axis
     // If axis = z then it's 7 bands (inc. 2 singular pole bands)  
