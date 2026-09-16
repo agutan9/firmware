@@ -5,9 +5,11 @@
 #include <bluefruit.h>
 #include <Qbead.h>
 
-static constexpr int NORTH_POLE_IDX = 0;
-static constexpr int SOUTH_POLE_IDX = 6;
-static constexpr int NUM_PIXELS = 62;
+//#define VERBOSE
+
+#define NORTH_POLE_IDX 0
+#define SOUTH_POLE_IDX 6
+#define NUM_PIXELS 62
 
 static uint32_t white = Adafruit_NeoPixel::Color(255, 255, 255);
 
@@ -27,31 +29,30 @@ uint32_t mapRedBlackGreen(uint8_t colorVal);
 uint32_t getContourColour(float geomInProd);
 void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
 
-// TODO: Why are we using const uint8_t and not static constexpr for some things? Does it matter performance-wise
+// TODO: Resolve inverse polarity issue (currently I think because everything is flipped RED maps to -Z not +Z)
+
 void setup() {
   Serial.begin(9600);
   delay(50);
   // IMU Might not initialize but should fail silently letting us test the LED
   bead.begin();
-  bead.pixels.setBrightness(5);
+  bead.pixels.setBrightness(10); // Per documentation this was only inteded for one-time setup usage
   initPixelLUT(bead);
   bead.testPixels();
-  delay(100);
+  delay(50);
   setContourBands(bead, state);
   bead.pixels.show();
   delay(100);
-  //
+  // Use to fake IMU axis
   test_rot_axis.setXYZ(0.0f, 1.0f, 0.0f);
 }
 
-void loop() {
-  // TODO: CHECK IF 0 and 6 are not acidentally swapped
-  // TODO: DO THIS BY GOING THROUGH ALL LEDS WITH PIXEL ON OFF WITH DELAY
+void loop() {  
   delay(100);
-  state.rotateAround(test_rot_axis, 1.5f);
+  //state.rotateAround(test_rot_axis, 1.5f);
   bead.clear(); // Redundant? as we write to all pixels
   // Pulsate
-  // TODO: WIP
+  // TODO: WIP -> Maybe just use the innante NeoPixel sine func?
   //const uint8_t period = 5000;
   //uint32_t t = millis() % period;
   //uint8_t x = (uint8_t)((t * 255UL) / period);
@@ -63,20 +64,6 @@ void loop() {
   setContourBands(bead, state);
   bead.pixels.show();
   //Serial.println("Contour axis changed by 3.5f.."); // TODO: REMOVE
-
-  // TODO: Showcases the ordering of the pixel ID's (Remove eventually)
-  //int counter = 0;
-  ////for (int t = 0; t < NUM_PIXELS; ++t)
-  //for (int t = 0; t < 18; ++t)
-  //{
-  //  delay(1000);
-  //  bead.clear();
-  //  bead.pixels.setPixelColor(t, white);
-  //  bead.show();
-  //  Serial.print("Showing only Pixel ID: ");
-  //  Serial.println(counter);
-  //  counter++;
-  //}
 }
 
 // TODO: Could use a hardcoded LU. Perhaps with a check if the assumed tot# of pixels is still the same(?)
@@ -113,11 +100,12 @@ void initPixelLUT(const Qbead::Qbead &bead)
         //
         //cum_theta += bead.theta_quant;
         cum_theta -= bead.theta_quant;
+#ifdef VERBOSE
         x = Qbead::sin_deg(cum_theta);
         y = 0.0f;
         z = Qbead::cos_deg(cum_theta);
-        //Serial.printf("Pixel ID[%d] Coords: {X:%.2f, Y:%.2f, Z:%.2f}\n", fleg_th, x, y, z);
-        Serial.printf("Pixel ID[%d] Cum_theta: :%.2f\n", fleg_th, cum_theta);
+        Serial.printf("Pixel ID[%d] Coords: {X:%.2f, Y:%.2f, Z:%.2f}\n", fleg_th, x, y, z);
+#endif
         // 
         pixelLUT[fleg_th] = {
             Qbead::sin_deg(cum_theta), // X = cos(p)sin(t)
@@ -143,12 +131,12 @@ void initPixelLUT(const Qbead::Qbead &bead)
             //
             cum_theta += bead.theta_quant;
             band_sin_theta = Qbead::sin_deg(cum_theta);
+#ifdef VERBOSE
             x = leg_cos_phi * band_sin_theta;
             y = leg_sin_phi * band_sin_theta;
             z = Qbead::cos_deg(cum_theta);
-            //Serial.printf("Pixel ID[%d] Coords: {X:%.2f, Y:%.2f, Z:%.2f}\n", p_i, x, y, z);
-            Serial.printf("Pixel ID[%d] Cum_theta: :%.2f\n", p_i, cum_theta);
-
+            Serial.printf("Pixel ID[%d] Coords: {X:%.2f, Y:%.2f, Z:%.2f}\n", p_i, x, y, z);
+#endif
             pixelLUT[p_i] = {
                 leg_cos_phi * band_sin_theta, // X = cos(p)sin(t)
                 leg_sin_phi * band_sin_theta, // Y = sin(p)sin(t)
@@ -163,8 +151,8 @@ uint32_t mapRedBlackGreenDiscontinuous(float geomInProd)
 {
     static constexpr uint32_t redBands[4]   = { 0x00000, 0x160609, 0x660005, 0xFF0505 }; // 0, 0.5, 0.87, 1.0
     static constexpr uint32_t greenBands[4] = { 0x00000, 0x061609, 0x006605, 0x05FF05 };
-    //static constexpr uint32_t redBands[4]   = { 0x00000, 0x330011, 0x660033, 0xFF0011 }; // 0, 0.5, 0.87, 1.0
-    //static constexpr uint32_t greenBands[4] = { 0x00000, 0x003311, 0x006633, 0x00FF11 };
+    //static constexpr uint32_t redBands[4]   = { 0x00000, 0x660000, 0xAA0000, 0xFF0000 }; // 0, 0.5, 0.87, 1.0
+    //static constexpr uint32_t greenBands[4] = { 0x00000, 0x006600, 0x00AA00, 0x00FF00 };
 
     float mag = geomInProd;
     if (geomInProd <= 0) mag *= -1;
@@ -173,8 +161,9 @@ uint32_t mapRedBlackGreenDiscontinuous(float geomInProd)
     else if (mag < 0.7f) idx = 1;    // ~0.5
     else if (mag < 0.95f) idx = 2;   // ~0.87
     else idx = 3;                    // ~1.0
-    //Serial.printf("In Prod[%.2f] gives mag: %.2f and idx: %d\n", geomInProd, mag, idx);
-
+#ifdef VERBOSE
+    Serial.printf("In Prod[%.2f] gives mag: %.2f and idx: %d\n", geomInProd, mag, idx);
+#endif
     return (geomInProd >= 0.0f) ? redBands[idx] : greenBands[idx];
 }
 
@@ -193,8 +182,11 @@ uint32_t mapRedBlackGreen(uint8_t colorVal)
     }
 }
 
-// TODO: Add customizability of contour map selection (ENUM probably?)
-uint32_t getContourColour(float geomInProd) 
+
+
+// TODO: If decide the colour maps should take input 0..255
+// refactor them for that and you will need this to convert your InProds
+float inProdToColorPos(float geomInProd)
 {
     // Contour distance (inner prod) in [-1..+1]. Need to map to [0-255]
     // Avoid 'round' for performance reasons -> add 0.5f
@@ -202,13 +194,19 @@ uint32_t getContourColour(float geomInProd)
     // risks a float-rounding overflow to 256->0 getting the anti-polar color assigned
     // TODO: Check if we need catch for North Polar Led due to inverted colour
     uint8_t colorPos = (uint8_t)(geomInProd * 127.5f + 128.0f);
-    //return mapRedBlackGreen(colorPos);
-    return mapRedBlackGreenDiscontinuous(colorPos);
 }
 
+// TODO: Add customizability of contour map selection (ENUM probably?)
+uint32_t getContourColour(float geomInProd, bool gammaCorrect = true) 
+{
+    //
+    uint32_t colorMapped =  mapRedBlackGreenDiscontinuous(geomInProd);
+    return gammaCorrect ? Adafruit_NeoPixel::gamma32(colorMapped) : colorMapped;
+}
 
 void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
 {
+    //
     float x = 0.0f;
     float y = 0.0f;
     float z = 0.0f;
@@ -238,9 +236,25 @@ void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
     }
 }
 
+// TODO: Remove and maybe add to Utils?
+void showPixelIdsOneByOne(Qbead::Qbead &bead, uint8_t waitTime, uint8_t lastID)
+{
+  //Showcases the ordering of the pixel ID's
+  int counter = 0;
+  for (int t = 0; t < lastID; ++t)
+  {
+    delay(waitTime);
+    bead.clear();
+    bead.pixels.setPixelColor(t, white);
+    bead.show();
+    Serial.print("Showing only Pixel ID: ");
+    Serial.println(counter);
+    counter++;
+  }
+}
+
  // QBEADS is visualised in discretized contour bands around the BlochV axis
-    // If axis = z then it's 7 bands (inc. 2 singular pole bands)
-    
+    // If axis = z then it's 7 bands (inc. 2 singular pole bands)  
     // #pixels: nlegs * (nsections - 1) + 2
     // +2 is the poles
     // sections is bands in between pixels
@@ -252,8 +266,6 @@ void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
     // calculate the color by some formula of the angle
     // Theta is half-sphere angle
     // Phi is full-sphere angle
-
     // Need to turn any pixel into a BlochVector / coordinate
-
     // acos(InnerProductGeom) is faster version of the intuitively more correct centralAngle
     // nvm that, using [-1..1] is totally fine
