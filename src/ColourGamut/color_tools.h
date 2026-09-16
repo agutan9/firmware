@@ -177,6 +177,66 @@ static constexpr HSVBand greenBandsHSV[5] = {
     {21845, 255, 255},  // hue 120 deg (green)  - idx4
 };
 
+// ===========================================================================
+// RED -> YELLOW -> BLACK
+// One bipolar-hemisphere pole. idx0 = dark red anchor, idx4 = bright
+// yellow-orange anchor. hue16=6554 (36 deg) at idx3 matches your liked 6553.
+// ===========================================================================
+static constexpr HSVBand redYellowBands[5] = {
+    {0,     255, 255},  // idx0: near-black red
+    {1820,  255, 210},  // idx1: 10 deg
+    {4005,  255, 150},  // idx2: 22 deg
+    {6554,  255, 90},   // idx3: 36 deg  (your liked hue)
+    {9102,  255, 40},   // idx4: 50 deg, bright yellow-orange
+};
+
+// ===========================================================================
+// GREEN -> YELLOW -> BLACK
+// Other bipolar-hemisphere pole. idx0 = dark green anchor, idx4 shares the
+// same yellow endpoint as redYellowBands (intentional - see note below).
+// hue16=18204 (100 deg) at idx1 is close to your liked 19960 (109.6 deg).
+// ===========================================================================
+static constexpr HSVBand greenYellowBands[5] = {
+    {21845, 255, 255},   // idx0: near-black green, 120 deg
+    {18204, 255, 190},   // idx1: 100 deg (near your liked 19960)
+    {15474, 255, 120},  // idx2: 85 deg
+    {11833, 255, 70},  // idx3: 65 deg
+    {9102,  255, 40},  // idx4: 50 deg, bright yellow (shared anchor w/ red map)
+};
+// NOTE: idx4 hue is intentionally identical between redYellowBands and
+// greenYellowBands, so "bright/high-magnitude" reads as a related color
+// language on both poles. If you want the two maps fully disjoint instead,
+// change greenYellowBands[4].hue to something like hue16(75) (~75 deg,
+// yellow-green) so it never touches the red map's yellow.
+
+// ===========================================================================
+// CORRELATION BEADS - OPTION A: BLUE -> BLUE-VIOLET
+// hue16=39321 (216 deg) at idx0 and 45874 (252 deg) at idx3 are both from
+// your liked list.
+// ===========================================================================
+static constexpr HSVBand correlationBlueVioletBands[5] = {
+    {39321, 255, 60},   // idx0: 216 deg  (your liked hue)
+    {41506, 255, 120},  // idx1: 228 deg
+    {43690, 255, 180},  // idx2: 240 deg, pure blue
+    {45874, 255, 230},  // idx3: 252 deg  (your liked hue)
+    {49151, 255, 255},  // idx4: 270 deg, blue-violet bright anchor
+};
+
+// ===========================================================================
+// CORRELATION BEADS - OPTION B: VIOLET -> MAGENTA
+// hue16=58981 (324 deg) at idx4 is from your liked list. Picks up where
+// Option A leaves off (270 deg) so the two options can be used together
+// as one continuous 10-step ramp (216 -> 324 deg) if you need to
+// distinguish two correlation-bead types on the same sphere.
+// ===========================================================================
+static constexpr HSVBand correlationVioletMagentaBands[5] = {
+    {49151, 255, 60},   // idx0: 270 deg
+    {52428, 255, 120},  // idx1: 288 deg
+    {54612, 255, 180},  // idx2: 300 deg
+    {56797, 255, 230},  // idx3: 312 deg
+    {58982, 255, 255},  // idx4: 324 deg  (your liked hue)
+};
+
 // Example usage for tuning:
 //
 //   uint8_t gammaLUT[256];

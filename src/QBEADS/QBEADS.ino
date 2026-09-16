@@ -16,8 +16,9 @@
 static uint32_t white = Adafruit_NeoPixel::Color(255, 255, 255);
 
 Qbead::Qbead bead;
-Qbead::BlochVector state;
-Qbead::BlochVector test_rot_axis;
+Qbead::BlochVector local_state;
+Qbead::BlochVector shared_state;
+Qbead::BlochVector rot_axis;
 
 struct PixelAxis {
     float x, y, z;
@@ -29,28 +30,32 @@ PixelAxis pixelLUT[NUM_PIXELS];
 // TODO: Remove or rectify
 void initPixelLUT(const Qbead::Qbead &bead);
 uint32_t mapRedBlackGreenDiscontinuous(float geomInProd);
-uint32_t getContourColour(float geomInProd);
-void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
+uint32_t getBaseContourColour(float geomInProd);
+void setLocalContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
+void setEntangledContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
 
 bool gammaToggle = true;
+bool entangledToggle = false;
 
+uint32_t lastToggleTime = 0;
+const uint32_t toggleInterval = 5000;
 
 void setup() {
     Serial.begin(9600);
     delay(50);
     // IMU Might not initialize but should fail silently letting us test the LED
     bead.begin();
-    bead.pixels.setBrightness(255); // Per documentation this was only inteded for one-time setup usage
+    bead.pixels.setBrightness(80); // Per documentation this was only inteded for one-time setup usage
     initPixelLUT(bead);
     bead.testPixels();
     delay(50);
-    setContourBands(bead, state);
+    setLocalContourBands(bead, local_state);
     bead.pixels.show();
     delay(100);
-    // Use to fake IMU axis
-    test_rot_axis.setXYZ(0.0f, 1.0f, 0.0f);
+    // Use to fake IMU axis and entanglement
+    shared_state.setXYZ(1.0f, 0.0f, 0.0f);
+    rot_axis.setXYZ(0.0f, 1.0f, 0.0f);
     bead.clear();
-
 
 }
 // TODO: Resolve inverse polarity issue (currently I think because everything is flipped RED maps to -Z not +Z)
@@ -60,12 +65,26 @@ void setup() {
 
 void loop() {  
     delay(100);
-    state.rotateAround(test_rot_axis, 1.5f);
-    bead.clear(); // Redundant? as we write to all pixels
-  
-    setContourBands(bead, state);
-    bead.pixels.show();
+    local_state.rotateAround(rot_axis, 0.5f);
+    shared_state.rotateAround(rot_axis, 0.5f);
     //Serial.println("Contour axis changed by 3.5f..");
+    bead.clear(); // Redundant? as we write to all pixels
+    if (entangledToggle)
+    {
+        setEntangledContourBands(bead, shared_state);
+    }
+    else 
+    {
+        setLocalContourBands(bead, local_state);
+    }
+    bead.pixels.show();
+
+    // TODO: Only one half
+    uint32_t now = millis();
+    if (now - lastToggleTime >= toggleInterval) {
+        entangledToggle = !entangledToggle;
+        lastToggleTime = now;
+    }
 }
 
 // TODO: Could use a hardcoded LU. Perhaps with a check if the assumed tot# of pixels is still the same(?)
@@ -148,6 +167,22 @@ void initPixelLUT(const Qbead::Qbead &bead)
     }
 }
 
+uint32_t mapCorrelationDiscontinuous(float geomInProd)
+{
+    float mag = geomInProd;
+    if (geomInProd <= 0) mag *= -1;
+    int idx = 0.0f;
+    if (mag < 0.05f) idx = 4;       // ~0.0 (orthogonal to axis)
+    else if (mag < 0.25f) idx = 4;   // ~0.13 (small angle off orthognal)
+    else if (mag < 0.7f) idx = 0;    // ~0.50 (45deg)
+    else if (mag < 0.95f) idx = 1;   // ~0.87 (smal angle off parallel)
+    else idx = 1; 
+    //
+    HSVBand band_HSV = correlationBlueYellowBands[idx];
+    //HSVBand band_HSV = (geomInProd >= 0.0f) ? correlationBlueVioletBands[rev_idx] : correlationVioletMagentaBands[rev_idx];
+    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
+}
+
 // Discontinuous red-green-black map, e.g. 5 bands each side (tune counts/colors to taste)
 uint32_t mapRedBlackGreenDiscontinuous(float geomInProd)
 {
@@ -155,16 +190,9 @@ uint32_t mapRedBlackGreenDiscontinuous(float geomInProd)
     // Pure Single Channel w/ manual Gamma correct
     //static constexpr uint32_t redBands[5]   = { 0x00000, 0x140000, 0x500000, 0xA00000, 0xFF0000 };
     //static constexpr uint32_t greenBands[5] = { 0x00000, 0x001400, 0x005000, 0x00A000, 0x00FF00 };
-    // Manual Gamma correct + Muddle attempt
-    //static constexpr uint32_t redBands[5]   = { 0x00000, 0x140502, 0x501004, 0xA20008, 0xFF0000 };
-    //static constexpr uint32_t greenBands[5] = { 0x00000, 0x051402, 0x105004, 0x20A008, 0x00FF00 };
     // HSL -> Blue shift
     //static constexpr uint32_t redBands[5]   = { 0x00001F, 0x3D0052, 0x8F006B, 0xCC0033, 0xFF0000 }; // idx0: near-black blue -> idx4: pure red
     //static constexpr uint32_t greenBands[5] = { 0x00001F, 0x002952, 0x008F8F, 0x00CC66, 0x00FF00 }; // idx0: near-black blue (same as red's) -> idx4: pure green
-    
-    // Using color tools for tuning
-
-
 
     float mag = geomInProd;
     if (geomInProd <= 0) mag *= -1;
@@ -213,14 +241,21 @@ float inProdToColorPos(float geomInProd)
 }
 
 // TODO: Add customizability of contour map selection (ENUM probably?)
-uint32_t getContourColour(float geomInProd, bool gammaCorrect = true) 
+uint32_t getBaseContourColour(float geomInProd, bool gammaCorrect = true) 
 {
     //
     uint32_t colorMapped =  mapRedBlackGreenDiscontinuous(geomInProd);
     return gammaCorrect ? Adafruit_NeoPixel::gamma32(colorMapped) : colorMapped;
 }
 
-void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
+uint32_t getEntangledContourColour(float geomInProd, bool gammaCorrect = true) 
+{
+    // TODO: JUST SHOWCASE. Instead of plane geomInProd would need some kind of correlation calculation
+    uint32_t colorMapped =  mapCorrelationDiscontinuous(geomInProd);
+    return gammaCorrect ? Adafruit_NeoPixel::gamma32(colorMapped) : colorMapped;
+}
+
+void setLocalContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
 {
     //
     float x = 0.0f;
@@ -238,7 +273,7 @@ void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
         Serial.printf("Pixel ID[%d] InProd: {X:%.2f, Y:%.2f, Z:%.2f} Sum: %.2f\n", p_i, x, y, z, sum);
 #endif
 
-        bead.pixels.setPixelColor(p_i, getContourColour(
+        bead.pixels.setPixelColor(p_i, getBaseContourColour(
             pixelLUT[p_i].x * arbAxis.x +
             pixelLUT[p_i].y * arbAxis.y +
             pixelLUT[p_i].z * arbAxis.z
@@ -248,6 +283,32 @@ void setContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
     }
 }
 
+void setEntangledContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
+{
+    float x = 0.0f;
+    float y = 0.0f;
+    float z = 0.0f;
+    float sum = 0.0f;
+
+    for (int p_i = 0; p_i < NUM_PIXELS; p_i++)
+    {
+        x = pixelLUT[p_i].x * arbAxis.x;
+        y = pixelLUT[p_i].y * arbAxis.y;
+        z = pixelLUT[p_i].z * arbAxis.z;
+        sum = x + y + z;
+#ifdef VERBOSE
+        Serial.printf("Pixel ID[%d] InProd: {X:%.2f, Y:%.2f, Z:%.2f} Sum: %.2f\n", p_i, x, y, z, sum);
+#endif
+        
+        bead.pixels.setPixelColor(p_i, getEntangledContourColour(
+            pixelLUT[p_i].x * arbAxis.x +
+            pixelLUT[p_i].y * arbAxis.y +
+            pixelLUT[p_i].z * arbAxis.z
+            // in-product with pixel's basis unit vecs
+            , gammaToggle
+        ));
+    }
+}
 
 //SECTION Testing and Utility
 // TODO: Remove and maybe add to Utils?
