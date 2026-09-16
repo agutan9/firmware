@@ -243,9 +243,9 @@ static constexpr HSVBand correlationVioletMagentaBands[5] = {
 // ===========================================================================
 static constexpr HSVBand correlationBlueYellowBands[5] = {
     {39321, 255, 200},   // idx0: dark #fffb00-hue anchor
-    {32178, 255, 120},  // idx1
-    {25036, 255, 180},  // idx2
-    {17893, 255, 230},  // idx3
+    {32178, 255, 80},  // idx1
+    {25036, 255, 40},  // idx2
+    {17893, 255, 80},  // idx3
     {10751, 255, 200},  // idx4: full #fffb00 bright anchor
 };
 

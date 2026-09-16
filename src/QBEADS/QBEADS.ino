@@ -31,25 +31,32 @@ PixelAxis pixelLUT[NUM_PIXELS];
 void initPixelLUT(const Qbead::Qbead &bead);
 uint32_t mapRedBlackGreenDiscontinuous(float geomInProd);
 uint32_t getBaseContourColour(float geomInProd);
-void setLocalContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
-void setEntangledContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis);
+void setLocalContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis, float damping);
+void setEntangledContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis, float damping, bool half);
 
 bool gammaToggle = true;
 bool entangledToggle = false;
+bool fadeToggle = false;
+bool fadeFlip = false;
+bool rotation = true;
+bool half = false;
 
-uint32_t lastToggleTime = 0;
+uint32_t lastFullToggleTime = 0;
+uint32_t fadeStartTime = 0;
 const uint32_t toggleInterval = 5000;
+const uint32_t fadeInterval = 600;
+float luxLevel = 1.0f;
 
 void setup() {
     Serial.begin(9600);
     delay(50);
     // IMU Might not initialize but should fail silently letting us test the LED
     bead.begin();
-    bead.pixels.setBrightness(80); // Per documentation this was only inteded for one-time setup usage
+    bead.pixels.setBrightness(255); // Per documentation this was only inteded for one-time setup usage
     initPixelLUT(bead);
     bead.testPixels();
     delay(50);
-    setLocalContourBands(bead, local_state);
+    setLocalContourBands(bead, local_state, luxLevel);
     bead.pixels.show();
     delay(100);
     // Use to fake IMU axis and entanglement
@@ -65,26 +72,60 @@ void setup() {
 
 void loop() {  
     delay(100);
-    local_state.rotateAround(rot_axis, 0.5f);
-    shared_state.rotateAround(rot_axis, 0.5f);
+    if (rotation)
+    {
+        local_state.rotateAround(rot_axis, 0.5f);
+        shared_state.rotateAround(rot_axis, 0.5f);
+    }
+
     //Serial.println("Contour axis changed by 3.5f..");
     bead.clear(); // Redundant? as we write to all pixels
+    
+    if (half) setLocalContourBands(bead, local_state, luxLevel);
     if (entangledToggle)
     {
-        setEntangledContourBands(bead, shared_state);
+        setEntangledContourBands(bead, shared_state, luxLevel, half);
     }
     else 
     {
-        setLocalContourBands(bead, local_state);
+        if (!half) setLocalContourBands(bead, local_state, luxLevel);
     }
     bead.pixels.show();
 
+    // Pulse in and out
+
     // TODO: Only one half
     uint32_t now = millis();
-    if (now - lastToggleTime >= toggleInterval) {
-        entangledToggle = !entangledToggle;
-        lastToggleTime = now;
+    if (fadeToggle)
+    {
+        uint32_t fadeNow = now - fadeStartTime;
+        uint32_t halfInterval = fadeInterval / 2;
+        // fadeNow is implicitly % fadeInterval here
+        uint8_t phase = (uint8_t)((fadeNow * 255UL) / fadeInterval);
+        // Want to start at 1.0 (sin8 starts at 0.5) so need to phase shift to a cosine
+        luxLevel = Adafruit_NeoPixel::sine8(phase + 64) / 255.0f;
+        if (!fadeFlip && fadeNow >= halfInterval)
+        {
+            fadeFlip = true; // disable further flips
+            entangledToggle = !entangledToggle;
+            lastFullToggleTime = now; // Count Interval from fade-in
+        }
+        if (fadeNow >= fadeInterval)
+        { // Reset and exit fade sub-loop
+            fadeFlip = false;
+            fadeToggle = false;
+            luxLevel = 1.0f;
+        }
     }
+    else 
+    { // toggleInterval counts from the moment of fading in
+        if (now - lastFullToggleTime >= toggleInterval) 
+        {
+            fadeToggle = true;
+            fadeStartTime = now;
+        }
+    }
+
 }
 
 // TODO: Could use a hardcoded LU. Perhaps with a check if the assumed tot# of pixels is still the same(?)
@@ -167,24 +208,24 @@ void initPixelLUT(const Qbead::Qbead &bead)
     }
 }
 
-uint32_t mapCorrelationDiscontinuous(float geomInProd)
+uint32_t mapCorrelationDiscontinuous(float geomInProd, float luxScale)
 {
     float mag = geomInProd;
     if (geomInProd <= 0) mag *= -1;
     int idx = 0.0f;
     if (mag < 0.05f) idx = 4;       // ~0.0 (orthogonal to axis)
-    else if (mag < 0.25f) idx = 4;   // ~0.13 (small angle off orthognal)
-    else if (mag < 0.7f) idx = 0;    // ~0.50 (45deg)
+    else if (mag < 0.25f) idx = 3;   // ~0.13 (small angle off orthognal)
+    else if (mag < 0.7f) idx = 2;    // ~0.50 (45deg)
     else if (mag < 0.95f) idx = 1;   // ~0.87 (smal angle off parallel)
-    else idx = 1; 
+    else idx = 0; 
     //
     HSVBand band_HSV = correlationBlueYellowBands[idx];
     //HSVBand band_HSV = (geomInProd >= 0.0f) ? correlationBlueVioletBands[rev_idx] : correlationVioletMagentaBands[rev_idx];
-    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
+    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val * luxScale);
 }
 
 // Discontinuous red-green-black map, e.g. 5 bands each side (tune counts/colors to taste)
-uint32_t mapRedBlackGreenDiscontinuous(float geomInProd)
+uint32_t mapRedBlackGreenDiscontinuous(float geomInProd, float luxScale)
 {
     // Contrast steps: 0, 20, 80, 160, 255
     // Pure Single Channel w/ manual Gamma correct
@@ -209,7 +250,7 @@ uint32_t mapRedBlackGreenDiscontinuous(float geomInProd)
     // TODO: reverse order
     uint8_t rev_idx = 4 - idx;
     HSVBand band_HSV = (geomInProd >= 0.0f) ? redYellowBands[rev_idx] : greenYellowBands[rev_idx];
-    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
+    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val * luxScale);
 }
 
 // TODO: Currently archaic and continuous
@@ -241,21 +282,21 @@ float inProdToColorPos(float geomInProd)
 }
 
 // TODO: Add customizability of contour map selection (ENUM probably?)
-uint32_t getBaseContourColour(float geomInProd, bool gammaCorrect = true) 
+uint32_t getBaseContourColour(float geomInProd, float luxScale, bool gammaCorrect = true) 
 {
     //
-    uint32_t colorMapped =  mapRedBlackGreenDiscontinuous(geomInProd);
+    uint32_t colorMapped =  mapRedBlackGreenDiscontinuous(geomInProd, luxScale);
     return gammaCorrect ? Adafruit_NeoPixel::gamma32(colorMapped) : colorMapped;
 }
 
-uint32_t getEntangledContourColour(float geomInProd, bool gammaCorrect = true) 
+uint32_t getEntangledContourColour(float geomInProd, float luxScale, bool gammaCorrect = true) 
 {
     // TODO: JUST SHOWCASE. Instead of plane geomInProd would need some kind of correlation calculation
-    uint32_t colorMapped =  mapCorrelationDiscontinuous(geomInProd);
+    uint32_t colorMapped =  mapCorrelationDiscontinuous(geomInProd, luxScale);
     return gammaCorrect ? Adafruit_NeoPixel::gamma32(colorMapped) : colorMapped;
 }
 
-void setLocalContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
+void setLocalContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis, float luxScale)
 {
     //
     float x = 0.0f;
@@ -278,20 +319,29 @@ void setLocalContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
             pixelLUT[p_i].y * arbAxis.y +
             pixelLUT[p_i].z * arbAxis.z
             // in-product with pixel's basis unit vecs
+            , luxScale
             , gammaToggle
         ));
     }
 }
 
-void setEntangledContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis)
+void setEntangledContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbAxis, float luxScale, bool half = false)
 {
     float x = 0.0f;
     float y = 0.0f;
     float z = 0.0f;
     float sum = 0.0f;
 
-    for (int p_i = 0; p_i < NUM_PIXELS; p_i++)
+    // TODO :Probbaly remove as it doesnt seem like it could work with this few pixels
+    const uint8_t pixelCount = half ? (((NUM_PIXELS - 2) / 2) + 2) : NUM_PIXELS;
+    
+    for (int p_i = 0; p_i < pixelCount; p_i++)
     {
+        if (half) 
+        {
+            if (p_i == 0 || p_i == 6) p_i++;
+        }
+
         x = pixelLUT[p_i].x * arbAxis.x;
         y = pixelLUT[p_i].y * arbAxis.y;
         z = pixelLUT[p_i].z * arbAxis.z;
@@ -305,6 +355,7 @@ void setEntangledContourBands(Qbead::Qbead &bead, const Qbead::BlochVector &arbA
             pixelLUT[p_i].y * arbAxis.y +
             pixelLUT[p_i].z * arbAxis.z
             // in-product with pixel's basis unit vecs
+            , luxScale
             , gammaToggle
         ));
     }
