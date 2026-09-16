@@ -52,6 +52,7 @@ namespace Qbead
             return BlochVector(-x, -y, -z);
         }
 
+        // returns result as new BlochVector
         BlochVector rotatedAround(const BlochVector &axis, const float angle) const
         {
             const float axis_x = axis.x;
