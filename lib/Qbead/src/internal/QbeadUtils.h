@@ -18,6 +18,7 @@ namespace Qbead
 #define QB_SX 0
 #define QB_SY 1
 #define QB_SZ 1
+#define INNER_STATE_COUNT 6
 
 // LSM6DS3 filter settings
 #define LSM6DS3_ACC_GYRO_LPF2_XL_EN 0x80
