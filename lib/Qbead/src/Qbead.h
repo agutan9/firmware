@@ -14,19 +14,10 @@
 namespace Qbead
 {
 
-  enum class CommandType : uint8_t
-  {
-    None = 0,            // Reserved: no packet / empty packet buffer.
-    SetOrchestrator = 1, // Set or announce the entanglement orchestrator.
-    Bell0 = 2,           // Request Bell state (|00> + |11>) / sqrt(2).
-    Bell1 = 3            // Request Bell state (|01> + |10>) / sqrt(2).
-  };
-
   class Qbead
   {
   public:
-    Qbead(BLEManager::Role role = BLEManager::Role::Dual,
-          const uint16_t pin00 = QB_LEDPIN,
+    Qbead(const uint16_t pin00 = QB_LEDPIN,
           const uint16_t pixelconfig = QB_PIXELCONFIG,
           const uint16_t nsections = QB_NSECTIONS,
           const uint16_t nlegs = QB_NLEGS,
@@ -44,8 +35,7 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz),
-          role(role)
+          sx(sx), sy(sy), sz(sz)
     {
     }
 
@@ -54,8 +44,8 @@ namespace Qbead
     LSM6DS3 imu;
     Adafruit_NeoPixel pixels;
     BLEManager::BLEManager ble;
-    BLEManager::Role role;
-    uint8_t isOrchastratorSet = 0; // 0 no, 1 yes I am, 2 yes but its not me
+    BlochVector innerStates[INNER_STATE_COUNT];
+    uint8_t innerStateCount = 0;
 
     const uint8_t nsections;
     const uint8_t nlegs;
@@ -145,18 +135,7 @@ namespace Qbead
 
       setupIMUTapDetection();
 
-      if (role == BLEManager::Role::Peripheral)
-      {
-        ble.beginPeripheral();
-      }
-      else if (role == BLEManager::Role::Central)
-      {
-        ble.beginCentral();
-      }
-      else
-      {
-        ble.beginDualRole();
-      }
+      ble.beginDualRole();
     }
 
     void clear()
@@ -319,7 +298,7 @@ namespace Qbead
       {
         return false;
       }
-      return packet.type == 1 && packet.value == 1;
+      return packet.type == BLEManager::CommandType::Tap && packet.value == 1;
     }
 
     BLEManager::DataPacket takeLatestPacket()
@@ -327,7 +306,7 @@ namespace Qbead
       BLEManager::DataPacket packet;
       if (!ble.takePacket(packet))
       {
-        return {0, 0};
+        return {BLEManager::CommandType::Tap, 0};
       }
       return packet;
     }
@@ -417,19 +396,36 @@ namespace Qbead
       rbuffer[2] = z;
     }
 
-    void orchastrate()
+    bool hasState(const BlochVector &state,
+                  float thetaTolerance = 1.0f,
+                  float phiTolerance = 1.0f) const
     {
-      if (isOrchastratorSet)
+      for (uint8_t i = 0; i < innerStateCount; i++)
       {
-        return;
+        const BlochVector &item = innerStates[i];
+
+        float thetaDifference = fabsf(item.theta - state.theta);
+
+        float phiDifference = fabsf(item.phi - state.phi);
+        phiDifference = min(phiDifference, 360.0f - phiDifference);
+
+        if (thetaDifference <= thetaTolerance &&
+            phiDifference <= phiTolerance)
+        {
+          return true;
+        }
       }
-      isOrchastratorSet = 1;
-      ble.sendData(static_cast<uint8_t>(CommandType::SetOrchestrator), 2); // set me orchastrator
+
+      return false;
     }
 
-    void setOrchestrate(uint8_t newValue)
+    void addState(BlochVector &state)
     {
-      isOrchastratorSet = newValue;
+      BlochVector newState(state.theta, state.phi);
+      if (!hasState(newState) && innerStateCount < INNER_STATE_COUNT)
+      {
+        innerStates[innerStateCount++] = newState;
+      }
     }
   }; // end class
 

@@ -6,17 +6,20 @@
 
 namespace BLEManager
 {
-  struct DataPacket
+  enum class CommandType : uint8_t
   {
-    uint8_t type; // this could be defined to refer to different operations
-    uint8_t value;
+    None = 0,
+    Tap = 1,
+    AddState = 2,
+    ClearStates = 3,
   };
 
-  enum class Role
+  struct DataPacket
   {
-    Peripheral,
-    Central,
-    Dual
+    CommandType type; 
+    uint32_t value;
+    uint32_t theta;
+    uint32_t phi;   
   };
 
   class BLEManager
@@ -41,7 +44,7 @@ namespace BLEManager
       qBeadDataChar.setFixedLen(sizeof(DataPacket));
       qBeadDataChar.begin();
 
-      DataPacket initial = {0, 0};
+      DataPacket initial = {CommandType::None, 0};
       qBeadDataChar.write(&initial, sizeof(initial));
     }
 
@@ -73,13 +76,13 @@ namespace BLEManager
 
     bool takePacket(DataPacket &packet)
     {
-      if (lastPacket.type == 0)
+      if (lastPacket.type == CommandType::Tap)
       {
         return false;
       }
 
       packet = lastPacket;
-      lastPacket = {0, 0};
+      lastPacket = {CommandType::Tap, 0, 0, 0};
       return true;
     }
 
@@ -224,11 +227,6 @@ namespace BLEManager
       DataPacket packet;
       memcpy(&packet, data, sizeof(packet));
       instance->lastPacket = packet;
-
-      Serial.print("type = ");
-      Serial.print(packet.type);
-      Serial.print(", value = ");
-      Serial.println(packet.value);
     }
     static void disconnect_callback(uint16_t conn_handle, uint8_t reason)
     {
@@ -239,9 +237,10 @@ namespace BLEManager
       }
     }
 
-    void sendData(uint8_t type, uint8_t value)
+    void sendData(CommandType type, uint32_t value, uint32_t theta,
+    uint32_t phi)
     {
-      DataPacket packet = {type, value};
+      DataPacket packet = {type, value, theta, phi};
 
       qBeadDataChar.write(&packet, sizeof(packet));
 
