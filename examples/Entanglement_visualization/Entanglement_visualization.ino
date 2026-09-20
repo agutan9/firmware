@@ -5,6 +5,7 @@ using namespace Qbead;
 
 Qbead::Qbead bead;
 int c_tap = 0;
+int setVisual = 0;
 
 #define NORTH_POLE_IDX 0
 #define SOUTH_POLE_IDX 6
@@ -47,8 +48,6 @@ void loadPreparedVisuals(uint8_t stateNumber)
     BlochVector down(180, 0);
     uint32_t blue = color(0, 0, 255);
     uint32_t red = color(255, 0, 0);
-    uint32_t white = color(255, 255, 255);
-
 
     if (stateNumber == 1)
     {
@@ -60,13 +59,13 @@ void loadPreparedVisuals(uint8_t stateNumber)
     }
     if (stateNumber == 2)
     {
-        bead.setBloch_deg(up, white);
+        bead.setBloch_deg(up, blue);
         bead.show();
-        delay(500);
+        delay(400);
         bead.clear();
-        bead.setBloch_deg(down, white);
+        bead.setBloch_deg(down, red);
         bead.show();
-        delay(500);
+        delay(400);
     }
     if(stateNumber == 3)
     { 
@@ -128,13 +127,12 @@ void setup()
     bead.setBrightness(25);
     initPixelLUT(bead);
     bead.testPixels();
-    bead.clear();
+    resetBead();
 }
 
 void resetBead()
 {
     bead.innerStateCount = 0;
-    bead.ble.sendData(BLEManager::CommandType::ClearStates, 0, 0, 0);
     bead.clear();
     bead.show();
 }
@@ -142,8 +140,7 @@ void resetBead()
 void loop()
 {
     bead.readIMU(false);
-
-    if (bead.wasTapped())
+    if(bead.wasTapped())
     {
         c_tap++;
         Serial.println(c_tap);
@@ -152,45 +149,52 @@ void loop()
     BLEManager::DataPacket packet = bead.takeLatestPacket();
     if (packet.type == BLEManager::CommandType::PreparedVisualizations)
     {
+        Serial.println("state update received");
         resetBead();
         loadPreparedVisuals(packet.value);
     }
     else if (packet.type == BLEManager::CommandType::ClearStates)
     {
-        c_tap = 0;
+        Serial.println("clear command received");
         bead.innerStateCount = 0;
-        bead.clear();
+        resetBead();
     }
     else
     {
-        if(c_tap > 25)
+        if(c_tap > 23)
         {
             c_tap = 0;
+            bead.ble.sendData(BLEManager::CommandType::ClearStates, 0, 0, 0);
             resetBead();
+            setVisual = 0;
         }
-        else if (c_tap >= 20)
+        else if (c_tap >= 18 && setVisual < 4)
         {
+            setVisual = 4;
             Serial.println("Setting entanglement with split-QBEADS");
             resetBead();
             bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 4, 0, 0);
             loadPreparedVisuals(4);
         }
-        else if (c_tap >= 15)
+        else if (c_tap >= 13 && setVisual < 3)
         {
+            setVisual = 3;
             Serial.println("Setting entanglement with QBEADS");
             resetBead();
             bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 3, 0, 0);
             loadPreparedVisuals(3);            
         }
-        else if (c_tap >= 10)
+        else if (c_tap >= 10 && setVisual < 3)
         {
+            setVisual = 2;
             Serial.println("Setting entanglement with cycling");
             resetBead();
             bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 2, 0, 0);
             loadPreparedVisuals(2);
         }
-        else if (c_tap >= 5)
+        else if (c_tap >= 5 && setVisual < 1)
         {
+            setVisual = 1;
             Serial.println("Setting entanglement with colours");
             resetBead();
             loadPreparedVisuals(1);
