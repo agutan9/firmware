@@ -12,6 +12,7 @@ namespace BLEManager
     Tap = 1,
     AddState = 2,
     ClearStates = 3,
+    PreparedVisualizations = 4, // 1 Bell0, 
   };
 
   struct DataPacket
