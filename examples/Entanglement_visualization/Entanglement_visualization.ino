@@ -17,8 +17,99 @@ struct PixelAxis
     float y;
     float z;
 };
+struct HSVBand { 
+    uint16_t hue;
+    uint8_t sat;
+    uint8_t val;
+};
+
+static constexpr HSVBand bandsRedYellow[5] = {
+    {0,     255, 255},  // idx0: near-black red
+    {1820,  255, 210},  // idx1: 10 deg
+    {4005,  255, 150},  // idx2: 22 deg
+    {6554,  255, 90},   // idx3: 36 deg  (your liked hue)
+    {9102,  255, 40},   // idx4: 50 deg, bright yellow-orange
+};
+static constexpr HSVBand bandsGreenYellow[5] = {
+    {21845, 255, 255},   // idx0: near-black green, 120 deg
+    {18204, 255, 190},   // idx1: 100 deg (near your liked 19960)
+    {15474, 255, 120},   // idx2: 85 deg
+    {11833, 255, 70},    // idx3: 65 deg
+    {9102,  255, 40},    // idx4: 50 deg, bright yellow (shared anchor w/ red map)
+};
+static constexpr HSVBand bandsBlueYellow[5] = {
+    {39321, 255, 200}, 
+    {32178, 255, 80},
+    {25036, 255, 40},
+    {17893, 255, 80},
+    {10751, 255, 200},
+};
+static constepxr bool gammaCorrect = true;
 
 PixelAxis pixelLUT[NUM_PIXELS];
+
+uint32_t pauliColorMap(float geomInProd)
+{
+
+    float mag = geomInProd;
+    if (geomInProd <= 0) mag *= -1;
+    int idx = 0.0f;
+    if (mag < 0.05f) idx = 0;        // ~0.0 (orthogonal to axis)
+    else if (mag < 0.25f) idx = 1;   // ~0.13 (small angle off orthognal)
+    else if (mag < 0.7f) idx = 2;    // ~0.50 (45deg)
+    else if (mag < 0.95f) idx = 3;   // ~0.87 (smal angle off parallel)
+    else idx = 4;                    // ~1.00 (parallel to axis)
+    uint8_t rev_idx = 4 - idx;
+    HSVBand band_HSV = (geomInProd >= 0.0f) ? bandsRedYellow[rev_idx] : bandsGreenYellow[rev_idx];
+    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
+}
+
+uint32_t entanglementColorMap(float geomInProd)
+{
+    float mag = geomInProd;
+    if (geomInProd <= 0) mag *= -1;
+    int idx = 0.0f;
+    if (mag < 0.05f) idx = 4;       // ~0.0 (orthogonal to axis)
+    else if (mag < 0.25f) idx = 3;   // ~0.13 (small angle off orthognal)
+    else if (mag < 0.7f) idx = 2;    // ~0.50 (45deg)
+    else if (mag < 0.95f) idx = 1;   // ~0.87 (smal angle off parallel)
+    else idx = 0; 
+    //
+    HSVBand band_HSV = bandsBlueYellow[idx];
+    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
+}
+
+void showContourBands(const Qbead::BlochVector &arbAxis, bool shared)
+{
+    float x = 0.0f;
+    float y = 0.0f;
+    float z = 0.0f;
+    float sum = 0.0f;
+
+    bead.clear();
+
+    for (int p_i = 0; p_i < NUM_PIXELS; p_i++)
+    {
+        // in-product with pixel's basis unit vecs
+        x = pixelLUT[p_i].x * arbAxis.x;
+        y = pixelLUT[p_i].y * arbAxis.y;
+        z = pixelLUT[p_i].z * arbAxis.z;
+        sum = x + y + z;
+        uint32_t color = 0;
+        if (shared)
+        {
+            color = entanglementColorMap(sum, luxScale);
+        }
+        else 
+        {
+            color = pauliColorMap(sum, luxScale);
+        }
+        color = gammaCorrect ? Adafruit_NeoPixel::gamma32(color) : color;
+
+        bead.pixels.setPixelColor(p_i, color);
+    }
+    bead.show();
+}
 
 void showYellowBlackHalves()
 {
@@ -69,7 +160,10 @@ void loadPreparedVisuals(uint8_t stateNumber)
     }
     if(stateNumber == 3)
     { 
-
+        showContourBands(up, false);
+        delay(400);
+        showContourBands(up, true);
+        delay(400);
     }
     if(stateNumber == 4)
     { 
