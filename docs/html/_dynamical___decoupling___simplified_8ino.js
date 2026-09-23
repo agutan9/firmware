@@ -1,0 +1,11 @@
+var _dynamical___decoupling___simplified_8ino =
+[
+    [ "current_state", "_dynamical___decoupling___simplified_8ino.html#a16178676ffaf79523b4eb3a62d411bb8", null ],
+    [ "loop", "_dynamical___decoupling___simplified_8ino.html#afe461d27b9c48d5921c00d521181f12f", null ],
+    [ "setup", "_dynamical___decoupling___simplified_8ino.html#a4fc01d736fe50cf5b977f755b675f11d", null ],
+    [ "target_state", "_dynamical___decoupling___simplified_8ino.html#aa70da1c03d296ae6db53fd1c5ca21d82", null ],
+    [ "zero_axis", "_dynamical___decoupling___simplified_8ino.html#adca9c3e1cead9abeac2586b1f2671463", null ],
+    [ "bead", "_dynamical___decoupling___simplified_8ino.html#a25a677af94d62be8d350f185c603625e", null ],
+    [ "purple", "_dynamical___decoupling___simplified_8ino.html#a70f96a4418f65df0f1da52c392dae4a2", null ],
+    [ "white", "_dynamical___decoupling___simplified_8ino.html#ac07eb4e2328f01012cb81288c9859a4a", null ]
+];

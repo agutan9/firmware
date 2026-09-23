@@ -1,3 +1,14 @@
+/**
+ * @file Qbead.h
+ * @author MDP Team (Tim Brussard, Barna Kirchoff, Ander Guitérrez)
+ * @brief The main file of the Qbead libray, which provides a simple interface to the Qbead hardware and its features.
+ * @version 0.1
+ * @date 2026-09-22
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
+
 #ifndef QBEAD_H
 #define QBEAD_H
 
@@ -11,9 +22,20 @@
 #include "internal/QbeadUtils.h"
 #include "internal/QbeadBLE.h"
 
+/**
+ * @brief The main namespace for the Qbead library
+ * 
+ * This namespace contains the Qbead class, which provides a simple interface to the Qbead hardware and its features.
+ * It also contains utility functions and constants related to the Qbead hardware.
+ */
 namespace Qbead
 {
 
+  /**
+   * @brief The main class for the Qbead library
+   * 
+   * This class provides a simple interface to the Qbead hardware and its features.
+   */
   class Qbead
   {
   public:
