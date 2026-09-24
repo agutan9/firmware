@@ -1,3 +1,14 @@
+/**
+ * @file QbeadBLE.h
+ * @author MDP Team (Tim Brussard, Barna Kirchoff, Ander Guitérrez)
+ * @brief This file contains the BLE-related functions and classes for the Qbead library.
+ * @version 0.1
+ * @date 2026-09-24
+ * 
+ * @copyright Copyright (c) 2026
+ * 
+ */
+
 #ifndef QBEAD_BLE_H
 #define QBEAD_BLE_H
 
