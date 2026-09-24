@@ -44,7 +44,8 @@ static constexpr HSVBand bandsBlueYellow[5] = {
     {17893, 255, 80},
     {10751, 255, 200},
 };
-static constepxr bool gammaCorrect = true;
+static bool gammaCorrect = true;
+
 
 PixelAxis pixelLUT[NUM_PIXELS];
 
@@ -98,11 +99,11 @@ void showContourBands(const Qbead::BlochVector &arbAxis, bool shared)
         uint32_t color = 0;
         if (shared)
         {
-            color = entanglementColorMap(sum, luxScale);
+            color = entanglementColorMap(sum);
         }
         else 
         {
-            color = pauliColorMap(sum, luxScale);
+            color = pauliColorMap(sum);
         }
         color = gammaCorrect ? Adafruit_NeoPixel::gamma32(color) : color;
 
@@ -137,6 +138,7 @@ void loadPreparedVisuals(uint8_t stateNumber)
 {
     BlochVector up(0, 0);
     BlochVector down(180, 0);
+    BlochVector plusState(90, 0);
     uint32_t blue = color(0, 0, 255);
     uint32_t red = color(255, 0, 0);
 
@@ -270,7 +272,7 @@ void loop()
             bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 4, 0, 0);
             loadPreparedVisuals(4);
         }
-        else if (c_tap >= 13 && setVisual < 3)
+        else if (c_tap >= 13 && setVisual < 4)
         {
             setVisual = 3;
             Serial.println("Setting entanglement with QBEADS");
