@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['de_0',['PlatformIO VS-Code + Arduino-DE',['../C:/Users/Ander/Documents/QIST/Segundo/MDP/firmware/README.md#autotoc_md19',1,'']]],
+  ['de_0',['PlatformIO VS-Code + Arduino-DE',['../index.html#autotoc_md19',1,'']]],
   ['dependencies_1',['Dependencies',['../md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md12',1,'']]],
   ['development_20guidelines_2',['Development Guidelines',['../md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md11',1,'']]],
   ['dynamical_5fdecoupling_2eino_3',['Dynamical_Decoupling.ino',['../_dynamical___decoupling_8ino.html',1,'']]],

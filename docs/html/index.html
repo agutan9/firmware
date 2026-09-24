@@ -5,7 +5,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=11"/>
 <meta name="generator" content="Doxygen 1.13.2"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Qbead: Main Page</title>
+<title>Qbead: firmware</title>
 <link rel="icon" href="logo.PNG" type="image/x-icon" />
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
@@ -103,10 +103,61 @@ $(function(){initNavTree('index.html',''); initResizable(true); });
 </div>
 </div>
 
-<div class="header">
-  <div class="headertitle"><div class="title">Qbead Documentation</div></div>
+<div><div class="header">
+  <div class="headertitle"><div class="title">firmware </div></div>
 </div><!--header-->
 <div class="contents">
+<div class="textblock"><p><a class="anchor" id="md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_r_e_a_d_m_e"></a></p>
+<h1><a class="anchor" id="autotoc_md15"></a>
+Installation</h1>
+<h1><a class="anchor" id="autotoc_md16"></a>
+Arduino-IDE</h1>
+<h2><a class="anchor" id="autotoc_md17"></a>
+Required board files</h2>
+<p>Add the following links to Arduino IDE =&gt; Preferences =&gt; Additional boards manager URLs.</p>
+<div class="fragment"><div class="line">https://adafruit.github.io/arduino-board-index/package_adafruit_index.json</div>
+<div class="line">https://files.seeedstudio.com/arduino/package_seeeduino_boards_index.json</div>
+</div><!-- fragment --><p>Then, install the board via Arduino IDE =&gt; Tools =&gt; Board =&gt; Boards Manager... and install "Seeed nRF52 Boards". When you plug in a qbead, the arduino IDE should recognize it as a Seeed XIAO nRF52840 Sense.</p>
+<h2><a class="anchor" id="autotoc_md18"></a>
+Packages</h2>
+<p>Add the following packages to Arduino IDE =&gt; Library Manager:</p><ul>
+<li>Adafruit NeoPixel</li>
+<li>Seeed Arduino LSM6DS3</li>
+</ul>
+<p>The <code>src</code> of this firmware also needs to be added as an Arduino library. This can be done two ways. The first option is to compress the <code>src</code> folder to a <code>.zip</code> file and then add it in Arduino IDE =&gt; sketch =&gt; Include library =&gt; Add .ZIP library. The second option is to create a symlink between the <code>src</code> folder and the Arduino library folder.</p>
+<h1><a class="anchor" id="autotoc_md19"></a>
+PlatformIO VS-Code + Arduino-DE</h1>
+<p>How to link Arduino-IDE to platformIO repo? You need to create 2 symlinks to your Arduino Sketches folder; see IDE/preferences for location if unsure. The following example commands work in both Windows &amp; Linux. Two shorthands will be used: PIO_REPO: This is the root dir of your git repo (and thus also the platformIO proj-dir) A_IDE_SKLOC: This is the root dir for all Arduino-IDE sketches. Note: Ideally, (re)name this folder without spaces as that could cause weird indexing errors (on Windows at least) INO_NAME: Arduino-IDE has the weird constraint that a project’s .ino file must have the same name as the project dir. Thus, the sketch project dir acting as the symlink must have the same name as how the main .ino file in the repo/src is named Source: For access to the core entry-point .ino sketch files. Note: need to use /src/ not /src Ex. $ ln -s “PIO_REPO/src/” “A_IDE_SKLOC/INO_NAME” Private Library: The core <a class="el" href="namespace_qbead.html" title="The main namespace for the Qbead library.">Qbead</a> firmware files need to be added as private libraries Ex. $ ln -s "/PIO_REPO/lib/Qbead" “A_IDE_SKLOC/Libraries/Qbead”</p>
+<h1><a class="anchor" id="autotoc_md20"></a>
+Contribution guidelines</h1>
+<h2><a class="anchor" id="autotoc_md21"></a>
+Architecture</h2>
+<ul>
+<li>The qbead class is there to serve as hardware abstraction for the motion sensor, BLE, and LEDs.</li>
+<li>The motion sensor is an "input device" completely uncoupled from what is shown on the LEDs output device. Various other firmware components or example sketches might connect the input and output for various purposes, but that should not be the default.</li>
+<li>The BLE is both for output (e.g. the measurements of the motion sensor are available over BLE) and for bridging to out output devices (e.g. setting the LEDs to a particular setting).</li>
+<li>Other firmware components might register their own independent BLE capabilities.</li>
+<li>The state class is simply a convenient way to store a block sphere and represent it in various ways. It can be used as an object to "plot" on the output device LEDs. It is not directly related to the values on the input device motion sensor (unless set to be related by an example sketch).</li>
+<li>There should be no blocking code and no <code>sleep</code> or <code>wait</code> functions. Rather anything that needs to be called at regular intervals should either use interrupts (rather advanced) or should keep its own page internally and just be called on each event loop iteration (similar to how the motion sensor is currently set or by having <code>now()-last_call &lt; period || return</code> type-of short circuits).</li>
+</ul>
+<h2><a class="anchor" id="autotoc_md22"></a>
+Code style</h2>
+<ul>
+<li>Keep the codebase organized as an Arduino library: a source folder for the underlying capabilities and an example folder with sketches that can be uploaded to the device.</li>
+<li>Keep the formatting style and naming conventions consistent the already existing code.</li>
+<li>If you make a breaking change to the library, you need to update all the sketches that use the broken feature.</li>
+<li>We are keeping the library in a single-header form. Extreme importance is put on the legibility of the code.</li>
+<li>The goal should be documented in a "literal programming" fashion, so it can be read as its own story.</li>
+<li>As a reference from another project: Here is an [example of how we want the code to look when rendered](legibility) and here is the <a href="https://github.com/SpinWearables/SpinWearablesFirmware/blob/master/src/SpinWearables.h">source for that render</a>. These are from a previous project with a similar educational goal &ndash; <a href="https://github.com/SpinWearables/SpinWearablesFirmware">the SpinWheel</a></li>
+</ul>
+<h2><a class="anchor" id="autotoc_md23"></a>
+<code>git</code> and Pull Request workflow</h2>
+<ul>
+<li>Many small PRs that build upon each other are drastically easier to review than one big PR.</li>
+<li>If you move code around put that change in a separate commit from the commit that edits such code &ndash; this is necessary for the diff viewer to show the changes in an easy-to-review fashion. Otherwise the review work increases by an order of magnitude.</li>
+<li>After you submit your pull request, open the files tab on the pull request page and do your own informal review to make sure you have not missed something. </li>
+</ul>
+</div></div><!-- PageDoc -->
 <a href="doxygen_crawl.html"></a>
 </div><!-- contents -->
 </div><!-- doc-content -->

@@ -17,7 +17,7 @@ var searchData=
   ['startbleadv_14',['startBLEadv',['../class_qbead_1_1_qbead.html#aac5b44d15165a4f3211f9dc90a2c978b',1,'Qbead::Qbead']]],
   ['state_20variables_15',['State Variables',['../md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md7',1,'']]],
   ['structure_16',['Project Structure',['../md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md3',1,'']]],
-  ['style_17',['Code style',['../C:/Users/Ander/Documents/QIST/Segundo/MDP/firmware/README.md#autotoc_md22',1,'']]],
+  ['style_17',['Code style',['../index.html#autotoc_md22',1,'']]],
   ['sx_18',['sx',['../class_qbead_1_1_qbead.html#a03cdbd30d7216a92a532a46d67cf0ae4',1,'Qbead::Qbead']]],
   ['sy_19',['sy',['../class_qbead_1_1_qbead.html#a99d86da98b9fe6f6b708b77ee183b98a',1,'Qbead::Qbead']]],
   ['sz_20',['sz',['../class_qbead_1_1_qbead.html#a2df6e7b7f22cbe26c2ba1e04b448b26b',1,'Qbead::Qbead']]]

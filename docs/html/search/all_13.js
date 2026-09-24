@@ -11,6 +11,6 @@ var searchData=
   ['testpixels_8',['testPixels',['../class_qbead_1_1_qbead.html#a6f7581da1b7d907999909dae534aacbe',1,'Qbead::Qbead']]],
   ['theta_9',['theta',['../class_qbead_1_1_bloch_vector.html#a0b4deb6ce3afddace6a12f112ef889ed',1,'Qbead::BlochVector::theta'],['../namespace_qbead.html#a2f694cbb7ff3a1e3e75a1459720615fe',1,'Qbead::theta()']]],
   ['theta_5fquant_10',['theta_quant',['../class_qbead_1_1_qbead.html#a8fdc36aa7371cc49f92ef2f5d1a39044',1,'Qbead::Qbead']]],
-  ['tt_20and_20pull_20request_20workflow_11',['&lt;tt&gt;git&lt;/tt&gt; and Pull Request workflow',['../C:/Users/Ander/Documents/QIST/Segundo/MDP/firmware/README.md#autotoc_md23',1,'']]],
-  ['tt_20git_20tt_20and_20pull_20request_20workflow_12',['&lt;tt&gt;git&lt;/tt&gt; and Pull Request workflow',['../C:/Users/Ander/Documents/QIST/Segundo/MDP/firmware/README.md#autotoc_md23',1,'']]]
+  ['tt_20and_20pull_20request_20workflow_11',['&lt;tt&gt;git&lt;/tt&gt; and Pull Request workflow',['../index.html#autotoc_md23',1,'']]],
+  ['tt_20git_20tt_20and_20pull_20request_20workflow_12',['&lt;tt&gt;git&lt;/tt&gt; and Pull Request workflow',['../index.html#autotoc_md23',1,'']]]
 ];

@@ -17,5 +17,5 @@ var searchData=
   ['blochvector_20src_20qbead_20h_3a158_20239_14',['BlochVector (src/Qbead.h:158-239)',['../md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md5',1,'']]],
   ['blochvector_2eh_15',['BlochVector.h',['../_bloch_vector_8h.html',1,'']]],
   ['blue_16',['blue',['../_tap__to___measure_8ino.html#a3e56de02abd941af2445699dbde7151f',1,'Tap_to_Measure.ino']]],
-  ['board_20files_17',['Required board files',['../C:/Users/Ander/Documents/QIST/Segundo/MDP/firmware/README.md#autotoc_md17',1,'']]]
+  ['board_20files_17',['Required board files',['../index.html#autotoc_md17',1,'']]]
 ];

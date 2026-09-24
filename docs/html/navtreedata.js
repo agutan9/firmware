@@ -25,6 +25,7 @@
 var NAVTREE =
 [
   [ "Qbead", "index.html", [
+    [ "firmware", "index.html", "index" ],
     [ "CLAUDE.md - QBead Library", "md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html", [
       [ "Overview", "md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md1", null ],
       [ "Hardware", "md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md2", null ],
@@ -73,7 +74,7 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "_b_l_e__bridge_8ino.html",
-"md__c_1_2_users_2_ander_2_documents_2_q_i_s_t_2_segundo_2_m_d_p_2firmware_2_c_l_a_u_d_e.html#autotoc_md11"
+"index.html#autotoc_md17"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronization';
