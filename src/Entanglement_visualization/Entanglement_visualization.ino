@@ -246,7 +246,6 @@ void setup()
     initPixelLUT(bead);
     bead.testPixels();
     resetBead();
-    Serial.println("ended");
 }
 
 void resetBead()
