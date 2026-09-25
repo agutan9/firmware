@@ -28,7 +28,7 @@ PIO_REPO: This is the root dir of your git repo (and thus also the platformIO pr
 A_IDE_SKLOC: This is the root dir for all Arduino-IDE sketches. Note: Ideally, (re)name this folder without spaces as that could cause weird indexing errors (on Windows at least)
 INO_NAME: Arduino-IDE has the weird constraint that a project’s .ino file must have the same name as the project dir. Thus, the sketch project dir acting as the symlink must have the same name as how the main .ino file in the repo/src is named
 Source: For access to the core entry-point .ino sketch files. Note: need to use /src/ not /src
-Ex. $ ln -s “PIO_REPO/src/” “A_IDE_SKLOC/INO_NAME”
+Ex. $ ln -s “PIO_REPO/src/” “A_IDE_SKLOC/INSERT” (For INSERT pick any name)
 Private Library: The core Qbead firmware files need to be added as private libraries
 Ex. $ ln -s "/PIO_REPO/lib/Qbead" “A_IDE_SKLOC/Libraries/Qbead”
 
