@@ -1,5 +1,5 @@
 #include <Qbead.h>
-#include <QbeadUtils.h>
+#include <internal/QbeadUtils.h>
 
 using namespace Qbead;
 
@@ -246,6 +246,7 @@ void setup()
     initPixelLUT(bead);
     bead.testPixels();
     resetBead();
+    Serial.println("ended");
 }
 
 void resetBead()
