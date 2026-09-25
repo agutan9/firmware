@@ -3,3 +3,4 @@
 .pio/
 backups/
 lib/README
+platformio.ini

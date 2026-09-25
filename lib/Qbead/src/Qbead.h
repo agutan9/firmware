@@ -17,7 +17,8 @@ namespace Qbead
   class Qbead
   {
   public:
-    Qbead(const uint16_t pin00 = QB_LEDPIN,
+    Qbead(BLEManager::Role role = BLEManager::Role::Peripheral,
+          const uint16_t pin00 = QB_LEDPIN,
           const uint16_t pixelconfig = QB_PIXELCONFIG,
           const uint16_t nsections = QB_NSECTIONS,
           const uint16_t nlegs = QB_NLEGS,
@@ -36,25 +37,16 @@ namespace Qbead
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
           sx(sx), sy(sy), sz(sz),
-          bleservice(QB_UUID_SERVICE),
-          blecharcol(QB_UUID_COL_CHAR),
-          blecharsph(QB_UUID_SPH_CHAR),
-          blecharacc(QB_UUID_ACC_CHAR),
-          blechartap(QB_UUID_TAP_CHAR)
+          role(role)
     {
     }
 
-    static Qbead *singletoninstance; // we need a global singleton static instance because bluefruit callbacks do not support context variables -- thankfully this is fine because there is indeed only one Qbead in existence at any time
+    static Qbead *callbackTarget; // we need a global singleton static instance because bluefruit callbacks do not support context variables -- thankfully this is fine because there is indeed only one Qbead in existence at any time
 
     LSM6DS3 imu;
     Adafruit_NeoPixel pixels;
-
-    BLEService bleservice;
-    BLECharacteristic blecharcol;
-    BLECharacteristic blecharsph;
-    BLECharacteristic blecharacc;
-    BLECharacteristic blechartap;
-    uint8_t connection_count = 0;
+    BLEManager::BLEManager ble;
+    BLEManager::Role role;
 
     const uint8_t nsections;
     const uint8_t nlegs;
@@ -70,28 +62,6 @@ namespace Qbead
     float T_imu;                                    // last update from the IMU
     bool tapped = false;
     bool tappedrecorded = false;
-
-    float t_ble, p_ble;        // theta and phi as sent over BLE connection
-    uint32_t c_ble = 0xffffff; // color as sent over BLE connection
-
-    static void ble_callback_color(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *data, uint16_t len)
-    {
-      Serial.println("[INFO]{BLE} Received a write on the color characteristic");
-      singletoninstance->c_ble = (data[2] << 16) | (data[1] << 8) | data[0];
-      Serial.print("[DEBUG]{BLE} Received");
-      Serial.println(singletoninstance->c_ble, HEX);
-    }
-
-    static void ble_callback_theta_phi(uint16_t conn_hdl, BLECharacteristic *chr, uint8_t *data, uint16_t len)
-    {
-      Serial.println("[INFO]{BLE} Received a write on the spherical coordinates characteristic");
-      singletoninstance->t_ble = ((uint32_t)data[0]) * 180 / 255;
-      singletoninstance->p_ble = ((uint32_t)data[1]) * 360 / 255;
-      Serial.print("[DEBUG]{BLE} Received t=");
-      Serial.print(singletoninstance->t_ble);
-      Serial.print(" p=");
-      Serial.println(singletoninstance->p_ble);
-    }
 
     void setupIMUTapDetection()
     {
@@ -141,7 +111,7 @@ namespace Qbead
 
     void begin()
     {
-      singletoninstance = this;
+      callbackTarget = this;
       Serial.begin(9600);
       //while (!Serial)
       //  ; // TODO some form of warning or a way to give up if Serial never becomes available
@@ -166,42 +136,14 @@ namespace Qbead
 
       setupIMUTapDetection();
 
-      // BLE Peripheral service setup
-      Bluefruit.begin(QB_MAX_PRPH_CONNECTION, 0);
-      Bluefruit.setName("qbead | " __DATE__ " " __TIME__);
-      Bluefruit.Periph.setConnectCallback(connect_callback);
-      bleservice.begin();
-      // BLE Characteristic Bloch Sphere Visualizer color setup
-      blecharcol.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
-      blecharcol.setPermission(SECMODE_OPEN, SECMODE_OPEN);
-      blecharcol.setUserDescriptor("BSV rgb color");
-      blecharcol.setFixedLen(3);
-      blecharcol.setWriteCallback(ble_callback_color);
-      blecharcol.begin();
-      blecharcol.write(zerobuffer20, 3);
-      // BLE Characteristic Bloch Sphere Visualizer spherical coordinate setup
-      blecharsph.setProperties(CHR_PROPS_READ | CHR_PROPS_WRITE);
-      blecharsph.setPermission(SECMODE_OPEN, SECMODE_OPEN);
-      blecharsph.setUserDescriptor("BSV spherical coordinates");
-      blecharsph.setFixedLen(2);
-      blecharsph.setWriteCallback(ble_callback_theta_phi);
-      blecharsph.begin();
-      blecharsph.write(zerobuffer20, 2);
-      // BLE Characteristic IMU xyz readout
-      blecharacc.setProperties(CHR_PROPS_READ | CHR_PROPS_NOTIFY);
-      blecharacc.setPermission(SECMODE_OPEN, SECMODE_OPEN);
-      blecharacc.setUserDescriptor("xyz acceleration");
-      blecharacc.setFixedLen(3 * sizeof(float));
-      blecharacc.begin();
-      blecharacc.write(zerobuffer20, 3 * sizeof(float));
-      // BLE Characteristic IMU xyz tap detection
-      blechartap.setProperties(CHR_PROPS_READ | CHR_PROPS_NOTIFY);
-      blechartap.setPermission(SECMODE_OPEN, SECMODE_OPEN);
-      blechartap.setUserDescriptor("xyz tap detection");
-      blechartap.setFixedLen(3 * sizeof(float));
-      blechartap.begin();
-      blechartap.write(zerobuffer20, 3 * sizeof(float));
-      startBLEadv();
+      if (role == BLEManager::Role::Peripheral)
+      {
+        ble.beginPeripheral();
+      }
+      else
+      {
+        ble.beginCentral();
+      }
     }
 
     void clear()
@@ -216,43 +158,14 @@ namespace Qbead
 
     void setLegPixelColor(int leg, int pixel, uint32_t color)
     {
-      leg = nlegs - leg; // invert direction for the phi angle, because the PCB is set up as a left-handed coordinate system
-      leg = leg % nlegs;
-      if (leg == 0)
-      {
-        pixels.setPixelColor(6 - pixel, color);
-      }
-      else if (pixel == 0)
-      {
-        pixels.setPixelColor(6, color);
-      }
-      else if (pixel == 6)
-      {
-        pixels.setPixelColor(0, color);
-      }
-      else
-      {
-        pixels.setPixelColor(7 + (leg - 1) * (nsections - 1) + pixel - 1, color);
-      }
+      int mappedPixelIndex = computePixelIndex(leg, pixel);
+      pixels.setPixelColor(mappedPixelIndex, color);
     }
 
     uint32_t getLegPixelColor(int leg, int pixel)
     {
-      leg = nlegs - leg; // invert direction for the phi angle, because the PCB is set up as a left-handed coordinate system
-      leg = leg % nlegs;
-      if (leg == 0)
-      {
-        return pixels.getPixelColor(pixel);
-      }
-      if (pixel == 0)
-      {
-        return pixels.getPixelColor(0);
-      }
-      if (pixel == 6)
-      {
-        return pixels.getPixelColor(6);
-      }
-      return pixels.getPixelColor(7 + (leg - 1) * (nsections - 1) + pixel - 1);
+      int mappedPixelIndex = computePixelIndex(leg, pixel);
+      return pixels.getPixelColor(mappedPixelIndex);
     }
 
     void addLegPixelColor(int leg, int pixel, uint32_t c0)
@@ -386,16 +299,26 @@ namespace Qbead
       return wasTapped;
     }
 
+    bool takeTapReceived()
+    {
+      BLEManager::DataPacket packet;
+      if (!ble.takePacket(packet))
+      {
+        return false;
+      }
+      return packet.type == 1 && packet.value == 1;
+    }
+
     static void tap_isr()
     {
       // This function is called when the IMU triggers an interrupt. That is: when a tap is detected!
-      // We have to refer to the singletoninstance of the qbead here,
+      // We have to refer to the callbackTarget of the qbead here,
       // because the one and only qbead object does not exist when this isr is defined.
       // Then readout XYZ immediately
       // We could choose to only readout XYZ when we haven't yet processed the last tap,
       // but for now, let's just update the position everytime we tap.
-      singletoninstance->tappedrecorded = false;
-      singletoninstance->tapped = true;
+      callbackTarget->tappedrecorded = false;
+      callbackTarget->tapped = true;
     }
 
     void readIMU(bool print = true)
@@ -441,13 +364,6 @@ namespace Qbead
         whentapped_buffer[0] = imu.readFloatAccelX();
         whentapped_buffer[1] = imu.readFloatAccelY();
         whentapped_buffer[2] = imu.readFloatAccelZ();
-        for (uint16_t conn_hdl = 0; conn_hdl < QB_MAX_PRPH_CONNECTION; conn_hdl++)
-        {
-          if (Bluefruit.connected(conn_hdl) && singletoninstance->blecharacc.notifyEnabled(conn_hdl))
-          {
-            singletoninstance->blechartap.notify(singletoninstance->whentapped_buffer, 3 * sizeof(float));
-          }
-        }
       }
 
       if (print)
@@ -476,49 +392,10 @@ namespace Qbead
       rbuffer[0] = x;
       rbuffer[1] = y;
       rbuffer[2] = z;
-      blecharacc.write(rbuffer, 3 * sizeof(float));
-
-      for (uint16_t conn_hdl = 0; conn_hdl < QB_MAX_PRPH_CONNECTION; conn_hdl++)
-      {
-        if (Bluefruit.connected(conn_hdl) && blecharacc.notifyEnabled(conn_hdl))
-        {
-          blecharacc.notify(rbuffer, 3 * sizeof(float));
-        }
-      }
     }
-
-    void startBLEadv(void)
-    {
-      Serial.println("[INFO]{BLE} Start advertising...");
-      // Advertising packet
-      Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
-      Bluefruit.Advertising.addTxPower();
-
-      // Include HRM Service UUID
-      Bluefruit.Advertising.addService(bleservice);
-
-      // Secondary Scan Response packet (optional)
-      // Since there is no room for 'Name' in Advertising packet
-      Bluefruit.ScanResponse.addName();
-
-      /* Start Advertising
-       * - Enable auto advertising if disconnected
-       * - Interval:  fast mode = 20 ms, slow mode = 152.5 ms
-       * - Timeout for fast mode is 30 seconds
-       * - Start(timeout) with timeout = 0 will advertise forever (until connected)
-       *
-       * For recommended advertising interval
-       * https://developer.apple.com/library/content/qa/qa1931/_index.html
-       */
-      Bluefruit.Advertising.restartOnDisconnect(true);
-      Bluefruit.Advertising.setInterval(32, 244); // in unit of 0.625 ms
-      Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
-      Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
-    }
-
   }; // end class
 
-  Qbead *Qbead::singletoninstance = nullptr;
+  Qbead *Qbead::callbackTarget = nullptr;
 
 } // end namespace
 
