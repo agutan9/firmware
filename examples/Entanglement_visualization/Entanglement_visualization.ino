@@ -6,6 +6,8 @@ using namespace Qbead;
 Qbead::Qbead bead;
 int c_tap = 0;
 int setVisual = 0;
+uint32_t lastTick = 0;
+bool stateSwap = false;
 
 #define NORTH_POLE_IDX 0
 #define SOUTH_POLE_IDX 6
@@ -17,28 +19,29 @@ struct PixelAxis
     float y;
     float z;
 };
-struct HSVBand { 
+struct HSVBand
+{
     uint16_t hue;
     uint8_t sat;
     uint8_t val;
 };
 
 static constexpr HSVBand bandsRedYellow[5] = {
-    {0,     255, 255},  // idx0: near-black red
-    {1820,  255, 210},  // idx1: 10 deg
-    {4005,  255, 150},  // idx2: 22 deg
-    {6554,  255, 90},   // idx3: 36 deg  (your liked hue)
-    {9102,  255, 40},   // idx4: 50 deg, bright yellow-orange
+    {0, 255, 255},    // idx0: near-black red
+    {1820, 255, 210}, // idx1: 10 deg
+    {4005, 255, 150}, // idx2: 22 deg
+    {6554, 255, 90},  // idx3: 36 deg  (your liked hue)
+    {9102, 255, 40},  // idx4: 50 deg, bright yellow-orange
 };
 static constexpr HSVBand bandsGreenYellow[5] = {
-    {21845, 255, 255},   // idx0: near-black green, 120 deg
-    {18204, 255, 190},   // idx1: 100 deg (near your liked 19960)
-    {15474, 255, 120},   // idx2: 85 deg
-    {11833, 255, 70},    // idx3: 65 deg
-    {9102,  255, 40},    // idx4: 50 deg, bright yellow (shared anchor w/ red map)
+    {21845, 255, 255}, // idx0: near-black green, 120 deg
+    {18204, 255, 190}, // idx1: 100 deg (near your liked 19960)
+    {15474, 255, 120}, // idx2: 85 deg
+    {11833, 255, 70},  // idx3: 65 deg
+    {9102, 255, 40},   // idx4: 50 deg, bright yellow (shared anchor w/ red map)
 };
 static constexpr HSVBand bandsBlueYellow[5] = {
-    {39321, 255, 200}, 
+    {39321, 255, 200},
     {32178, 255, 80},
     {25036, 255, 40},
     {17893, 255, 80},
@@ -46,20 +49,25 @@ static constexpr HSVBand bandsBlueYellow[5] = {
 };
 static bool gammaCorrect = true;
 
-
 PixelAxis pixelLUT[NUM_PIXELS];
 
 uint32_t pauliColorMap(float geomInProd)
 {
 
     float mag = geomInProd;
-    if (geomInProd <= 0) mag *= -1;
+    if (geomInProd <= 0)
+        mag *= -1;
     int idx = 0.0f;
-    if (mag < 0.05f) idx = 0;        // ~0.0 (orthogonal to axis)
-    else if (mag < 0.25f) idx = 1;   // ~0.13 (small angle off orthognal)
-    else if (mag < 0.7f) idx = 2;    // ~0.50 (45deg)
-    else if (mag < 0.95f) idx = 3;   // ~0.87 (smal angle off parallel)
-    else idx = 4;                    // ~1.00 (parallel to axis)
+    if (mag < 0.05f)
+        idx = 0; // ~0.0 (orthogonal to axis)
+    else if (mag < 0.25f)
+        idx = 1; // ~0.13 (small angle off orthognal)
+    else if (mag < 0.7f)
+        idx = 2; // ~0.50 (45deg)
+    else if (mag < 0.95f)
+        idx = 3; // ~0.87 (smal angle off parallel)
+    else
+        idx = 4; // ~1.00 (parallel to axis)
     uint8_t rev_idx = 4 - idx;
     HSVBand band_HSV = (geomInProd >= 0.0f) ? bandsRedYellow[rev_idx] : bandsGreenYellow[rev_idx];
     return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
@@ -68,13 +76,19 @@ uint32_t pauliColorMap(float geomInProd)
 uint32_t entanglementColorMap(float geomInProd)
 {
     float mag = geomInProd;
-    if (geomInProd <= 0) mag *= -1;
+    if (geomInProd <= 0)
+        mag *= -1;
     int idx = 0.0f;
-    if (mag < 0.05f) idx = 4;       // ~0.0 (orthogonal to axis)
-    else if (mag < 0.25f) idx = 3;   // ~0.13 (small angle off orthognal)
-    else if (mag < 0.7f) idx = 2;    // ~0.50 (45deg)
-    else if (mag < 0.95f) idx = 1;   // ~0.87 (smal angle off parallel)
-    else idx = 0; 
+    if (mag < 0.05f)
+        idx = 4; // ~0.0 (orthogonal to axis)
+    else if (mag < 0.25f)
+        idx = 3; // ~0.13 (small angle off orthognal)
+    else if (mag < 0.7f)
+        idx = 2; // ~0.50 (45deg)
+    else if (mag < 0.95f)
+        idx = 1; // ~0.87 (smal angle off parallel)
+    else
+        idx = 0;
     //
     HSVBand band_HSV = bandsBlueYellow[idx];
     return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
@@ -101,7 +115,7 @@ void showContourBands(const Qbead::BlochVector &arbAxis, bool shared)
         {
             color = entanglementColorMap(sum);
         }
-        else 
+        else
         {
             color = pauliColorMap(sum);
         }
@@ -152,23 +166,31 @@ void loadPreparedVisuals(uint8_t stateNumber)
     }
     if (stateNumber == 2)
     {
-        bead.setBloch_deg(up, blue);
+        if (stateSwap)
+        {
+            bead.setBloch_deg(up, blue);
+        }
+        else
+        {
+            bead.setBloch_deg(down, red);
+        }
+        stateSwap = !stateSwap;
         bead.show();
-        delay(400);
-        bead.clear();
-        bead.setBloch_deg(down, red);
-        bead.show();
-        delay(400);
     }
-    if(stateNumber == 3)
-    { 
-        showContourBands(up, false);
-        delay(400);
-        showContourBands(up, true);
-        delay(400);
+    if (stateNumber == 3)
+    {
+        if (stateSwap)
+        {
+            showContourBands(up, false);
+        }
+        else
+        {
+            showContourBands(up, true);
+        }
+        stateSwap = !stateSwap;
     }
-    if(stateNumber == 4)
-    { 
+    if (stateNumber == 4)
+    {
         Serial.println("Showing yellow/black split sphere");
         showYellowBlackHalves();
     }
@@ -236,7 +258,7 @@ void resetBead()
 void loop()
 {
     bead.readIMU(false);
-    if(bead.wasTapped())
+    if (bead.wasTapped())
     {
         c_tap++;
         Serial.println(c_tap);
@@ -257,14 +279,14 @@ void loop()
     }
     else
     {
-        if(c_tap > 23)
+        if (c_tap > 25)
         {
             c_tap = 0;
             bead.ble.sendData(BLEManager::CommandType::ClearStates, 0, 0, 0);
             resetBead();
             setVisual = 0;
         }
-        else if (c_tap >= 18 && setVisual < 4)
+        else if (c_tap >= 20 && setVisual < 4)
         {
             setVisual = 4;
             Serial.println("Setting entanglement with split-QBEADS");
@@ -272,21 +294,35 @@ void loop()
             bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 4, 0, 0);
             loadPreparedVisuals(4);
         }
-        else if (c_tap >= 13 && setVisual < 4)
+        else if (c_tap >= 15 && setVisual < 4)
         {
-            setVisual = 3;
-            Serial.println("Setting entanglement with QBEADS");
-            resetBead();
-            bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 3, 0, 0);
-            loadPreparedVisuals(3);            
+            uint32_t current = millis();
+            uint32_t deltaTime = current - lastTick;
+
+            if (deltaTime >= 400 || setVisual < 3)
+            {
+                lastTick = current;
+                setVisual = 3;
+                Serial.println("Setting entanglement with QBEADS");
+                resetBead();
+                bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 3, 0, 0);
+                loadPreparedVisuals(3);
+            }
         }
         else if (c_tap >= 10 && setVisual < 3)
         {
-            setVisual = 2;
-            Serial.println("Setting entanglement with cycling");
-            resetBead();
-            bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 2, 0, 0);
-            loadPreparedVisuals(2);
+            uint32_t current = millis();
+            uint32_t deltaTime = current - lastTick;
+
+            if (deltaTime >= 400 || setVisual < 2)
+            {
+                lastTick = current;
+                setVisual = 2;
+                Serial.println("Setting entanglement with cycling");
+                resetBead();
+                bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 2, 0, 0);
+                loadPreparedVisuals(2);
+            }
         }
         else if (c_tap >= 5 && setVisual < 1)
         {
