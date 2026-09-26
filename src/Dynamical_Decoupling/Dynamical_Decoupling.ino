@@ -17,12 +17,12 @@
 
 Qbead::Qbead bead;
 
-BlochVector current_state(90, 0);
-BlochVector target_state(90, 0);
+Qbead::BlochVector current_state(90, 0);
+Qbead::BlochVector target_state(90, 0);
 
 // Prepare some colors for the visualization during the game.
-uint32_t purple = color(255, 0, 255);
-uint32_t white = color(255, 255, 255);
+uint32_t purple = Qbead::color(255, 0, 255);
+uint32_t white = Qbead::color(255, 255, 255);
 
 // ## Setup
 //
@@ -62,7 +62,7 @@ void loop() {
   //
   // The decoherence is simulated by rotating the current state around a fixed laboratory frame.
   // We happen to use the direction of gravity as reported by the IMU in this example.
-  current_state.rotateAround(BlochVector(bead.x, bead.y, bead.z), 0.2);
+  current_state.rotateAround(Qbead::BlochVector(bead.x, bead.y, bead.z), 0.2);
 
   if (bead.wasTapped()) {
     Serial.println("TAP");
@@ -76,6 +76,4 @@ void loop() {
   Serial.print(current_state_visible);
   Serial.print(" | Angle: ");
   Serial.print(current_state.phi);
-  Serial.print(" | Speed: ");
-  Serial.println(rotation_speed);
 }
