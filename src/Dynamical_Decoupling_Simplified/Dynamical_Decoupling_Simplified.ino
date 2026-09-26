@@ -18,15 +18,15 @@
 
 Qbead::Qbead bead;
 
-BlochVector current_state(90, 0);
-BlochVector target_state(90, 0);
+Qbead::BlochVector current_state(90, 0);
+Qbead::BlochVector target_state(90, 0);
 
 // The zero axis is the fixed axis around which decoherence rotates.
-BlochVector zero_axis(0, 0);
+Qbead::BlochVector zero_axis(0, 0);
 
 // Prepare some colors for the visualization during the game.
-uint32_t purple = color(255, 0, 255);
-uint32_t white = color(255, 255, 255);
+uint32_t purple = Qbead::color(255, 0, 255);
+uint32_t white = Qbead::color(255, 255, 255);
 
 // ## Setup
 //
@@ -69,7 +69,7 @@ void loop() {
   //
   // The decoherence is simulated by rotating the current state around the fixed zero axis.
   // The rotation speed depends on the inner product between the zero axis and the IMU measurement.
-  float rotation_speed = 0.2 * innerProductGeom(zero_axis, BlochVector(bead.x, bead.y, bead.z));
+  float rotation_speed = 0.2 * innerProductGeom(zero_axis, Qbead::BlochVector(bead.x, bead.y, bead.z));
   current_state.rotateAround(zero_axis, rotation_speed);
 
   // ### Check for taps

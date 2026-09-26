@@ -23,7 +23,7 @@ void setup() {
 void loop() {
   bead.readIMU(true);
   bead.clear();
-  bead.setBloch_deg_smooth(bead.t_ble, bead.p_ble, bead.c_ble);
+  bead.setBloch_deg_smooth({bead.x, bead.y, bead.z}, 100);
   bead.show();
   delay(20);
 }

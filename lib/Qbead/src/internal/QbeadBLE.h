@@ -63,17 +63,37 @@ namespace BLEManager
   public:
     BLEManager()
         : qBeadClientService(Qbead::QB_UUID_SERVICE),
-          qBeadDataClient(Qbead::QB_UUID_DATA_CHAR),
           bleservice(Qbead::QB_UUID_SERVICE),
-          qBeadDataChar(Qbead::QB_UUID_DATA_CHAR)
+          qBeadDataClient(Qbead::QB_UUID_DATA_CHAR),
+          qBeadDataChar(Qbead::QB_UUID_DATA_CHAR),
+          qBeadTapClient(Qbead::QB_UUID_TAP_CHAR),
+          qBeadTapChar(Qbead::QB_UUID_TAP_CHAR),
+          qBeadCharAccClient(Qbead::QB_UUID_ACC_CHAR),
+          qBeadCharAccChar(Qbead::QB_UUID_ACC_CHAR),
+          qBeadSphCharClient(Qbead::QB_UUID_SPH_CHAR),
+          qBeadSphCharChar(Qbead::QB_UUID_SPH_CHAR),
+          qBeadColCharClient(Qbead::QB_UUID_COL_CHAR),
+          qBeadColCharChar(Qbead::QB_UUID_COL_CHAR)
     {
     }
 
     BLEClientService qBeadClientService;
-    BLEClientCharacteristic qBeadDataClient;
-
     BLEService bleservice;
+    
+    BLEClientCharacteristic qBeadDataClient;
     BLECharacteristic qBeadDataChar;
+
+    BLEClientCharacteristic qBeadTapClient;
+    BLECharacteristic qBeadTapChar;
+
+    BLEClientCharacteristic qBeadCharAccClient;
+    BLECharacteristic qBeadCharAccChar;
+
+    BLEClientCharacteristic qBeadSphCharClient;
+    BLECharacteristic qBeadSphCharChar;
+
+    BLEClientCharacteristic qBeadColCharClient;
+    BLECharacteristic qBeadColCharChar;
 
     bool takePacket(DataPacket &packet)
     {

@@ -17,7 +17,7 @@
 Qbead::Qbead bead;
 
 // The zero axis is the fixed axis around which decoherence rotates.
-BlochVector zero_axis(0, 0);
+Qbead::BlochVector zero_axis(0, 0);
 
 // Track the spread of the quantum state ensemble.
 float spread = 0;
@@ -26,8 +26,8 @@ float spread = 0;
 const int bar_section = 3;
 
 // Prepare some colors for the visualization during the game.
-uint32_t purple = color(255, 0, 255);
-uint32_t white = color(255, 255, 255);
+uint32_t purple = Qbead::color(255, 0, 255);
+uint32_t white = Qbead::color(255, 255, 255);
 
 // ## Setup
 //
@@ -65,7 +65,7 @@ void loop() {
     }
     // Partially light the outermost LEDs based on the fractional part of spread.
     if (spread_int < QB_NLEGS / 2) {
-      uint32_t edge_color = scaleColorQuad(spread_frac, purple);
+      uint32_t edge_color = Qbead::scaleColorQuad(spread_frac, purple);
       bead.setLegPixelColor(spread_int + 1, bar_section, edge_color);
       bead.setLegPixelColor(-(spread_int + 1), bar_section, edge_color);
     }
@@ -78,7 +78,7 @@ void loop() {
   //
   // The spread increases based on the inner product between the zero axis and gravity.
   // This represents how the ensemble of quantum states would spread out over time.
-  float spread_rate = 0.004 * innerProductGeom(zero_axis, BlochVector(bead.x, bead.y, bead.z));
+  float spread_rate = 0.004 * innerProductGeom(zero_axis, Qbead::BlochVector(bead.x, bead.y, bead.z));
   spread += spread_rate;
 
   // Keep spread within bounds of plus-or-minus half the number of legs.
