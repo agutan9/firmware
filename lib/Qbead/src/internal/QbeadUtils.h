@@ -18,6 +18,7 @@ namespace Qbead
 #define QB_SX 0
 #define QB_SY 1
 #define QB_SZ 1
+#define INNER_STATE_COUNT 6
 
 // LSM6DS3 filter settings
 #define LSM6DS3_ACC_GYRO_LPF2_XL_EN 0x80
@@ -38,6 +39,8 @@ namespace Qbead
         {0x45, 0x8d, 0x08, 0xaa, 0xd6, 0x63, 0x44, 0x25, 0xbe, 0x12, 0x9c, 0x35, 0xc6 + 3, 0x1f, 0x0c, 0xe3};
     const uint8_t QB_UUID_TAP_CHAR[] =
         {0x45, 0x8d, 0x08, 0xaa, 0xd6, 0x63, 0x44, 0x25, 0xbe, 0x12, 0x9c, 0x35, 0xc6 + 4, 0x1f, 0x0c, 0xe3};
+    const uint8_t QB_UUID_DATA_CHAR[] =
+        {0x45, 0x8d, 0x08, 0xaa, 0xd6, 0x63, 0x44, 0x25, 0xbe, 0x12, 0x9c, 0x35, 0xc6 + 5, 0x1f, 0x0c, 0xe3};
 
     const uint8_t zerobuffer20[] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
 
@@ -188,6 +191,21 @@ namespace Qbead
     bool checkThetaAndPhi(float theta, float phi)
     {
         return theta >= 0 && theta <= 180 && phi >= 0 && phi <= 360;
+    }
+
+    int computePixelIndex(int leg, int pixel)
+    {
+        leg = QB_NLEGS - leg; // invert direction for the phi angle, because the PCB is set up as a left-handed coordinate system
+        leg = leg % QB_NLEGS;
+        if (leg == 0)
+        {
+            return pixel;
+        }
+        else if (pixel == 0 || pixel == QB_NSECTIONS)
+        {
+            return pixel;
+        }
+        return (QB_NSECTIONS + 1) + (leg - 1) * (QB_NSECTIONS - 1) + pixel - 1;
     }
 }
 
