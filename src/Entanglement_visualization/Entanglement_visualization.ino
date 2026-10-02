@@ -66,23 +66,23 @@ uint32_t pauliColorMap(float geomInProd)
     uint8_t idx;
 
     if (mag < 0.05f)
-    {
+    { // ~0.0 (orthogonal to axis)
         idx = 0;
     }
     else if (mag < 0.25f)
-    {
+    { // ~0.13 (small angle off orthognal)
         idx = 1;
     }
     else if (mag < 0.70f)
-    {
+    { // ~0.50 (45deg)
         idx = 2;
     }
     else if (mag < 0.95f)
-    {
+    { // ~0.87 (smal angle off parallel)
         idx = 3;
     }
     else
-    {
+    { // ~1.00 (parallel to axis)
         idx = 4;
     }
 
@@ -104,25 +104,25 @@ uint32_t entanglementColorMap(float geomInProd)
     const float mag = fabsf(geomInProd);
 
     uint8_t idx;
-
+    // hardcoded to be 90deg offset from tracking axis
     if (mag < 0.05f)
-    {
+    { // ~1.00 (parallel to axis)
         idx = 4;
     }
     else if (mag < 0.25f)
-    {
+    { // ~0.13 (small angle off orthognal)
         idx = 3;
     }
     else if (mag < 0.70f)
-    {
+    { // ~0.50 (45deg)
         idx = 2;
     }
     else if (mag < 0.95f)
-    {
+    { // ~0.87 (smal angle off parallel)
         idx = 1;
     }
     else
-    {
+    { // ~1.0 (orthogonal to axis)
         idx = 0;
     }
 
@@ -291,7 +291,7 @@ void initPixelLUT(const Qbead::Qbead &bead)
     pixelLUT[SOUTH_POLE_IDX] = {0.0f, 0.0f, 1.0f};
 
     const int pixelsPerLeg = bead.nsections - 1;
-
+    // First physical leg: pixel order runs from south toward north
     for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
     {
         const float theta =
@@ -302,7 +302,7 @@ void initPixelLUT(const Qbead::Qbead &bead)
             0.0f,
             Qbead::cos_deg(theta)};
     }
-
+    // Remaining physical legs: theta runs from north toward south
     for (int phiIndex = 1; phiIndex < bead.nlegs; phiIndex++)
     {
         const float phi = phiIndex * bead.phi_quant;
