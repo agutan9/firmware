@@ -61,6 +61,16 @@ namespace Qbead
     float T_imu;                                    // last update from the IMU
     bool tapped = false;
     bool tappedrecorded = false;
+    uint32_t stateColours[INNER_STATE_COUNT] = {
+        color(0, 0, 255),   // Blue
+        color(255, 0, 0),   // Red
+        color(0, 255, 0),   // Green
+        color(255, 255, 0), // Yellow
+        color(255, 0, 255), // Magenta
+        color(255, 128, 0)  // Orange
+    };
+    uint32_t cyclingIndex = 0;
+    uint32_t lastChange = 0;
 
     void setupIMUTapDetection()
     {
@@ -279,22 +289,12 @@ namespace Qbead
       return wasTapped;
     }
 
-    bool takeTapReceived()
-    {
-      BLEManager::DataPacket packet;
-      if (!ble.takePacket(packet))
-      {
-        return false;
-      }
-      return packet.type == BLEManager::CommandType::Tap && packet.value == 1;
-    }
-
     BLEManager::DataPacket takeLatestPacket()
     {
       BLEManager::DataPacket packet;
       if (!ble.takePacket(packet))
       {
-        return {BLEManager::CommandType::Tap, 0};
+        return {BLEManager::CommandType::None, 0};
       }
       return packet;
     }
@@ -414,6 +414,61 @@ namespace Qbead
       {
         innerStates[innerStateCount++] = newState;
       }
+    }
+
+    void clearStates()
+    {
+      innerStateCount = 0;
+    }
+
+    void applyPreparedState(uint32_t state)
+    {
+      BlochVector up(0, 0);
+      BlochVector down(180, 0);
+      if (state == 1)
+      {
+        this->clearStates();
+        this->addState(up);
+        this->addState(down);
+      }
+      else if (state == 2)
+      {
+        this->clearStates();
+        this->addState(down);
+        this->addState(up);
+      }
+    }
+
+    void displayCurrentStatesStatic()
+    {
+      this->clear();
+      for (uint8_t i = 0; i < innerStateCount; i++)
+      {
+        const BlochVector &item = innerStates[i];
+        const uint32_t &itemColour = stateColours[i];
+
+        this->setBloch_deg(item, itemColour);
+      }
+      this->show();
+    }
+
+    void displayCurrentStatesCycling()
+    {
+      if (innerStateCount == 0)
+      {
+        return;
+      }
+      uint32_t currentTime = millis();
+      uint32_t deltaTime = currentTime - lastChange;
+      if (deltaTime < CYCLING_TIME)
+      {
+        return;
+      }
+      this->clear();
+      lastChange = currentTime;
+      this->setBloch_deg(innerStates[cyclingIndex], stateColours[cyclingIndex]);
+      this->show();
+      cyclingIndex = (cyclingIndex + 1) % (innerStateCount);
     }
   }; // end class
 

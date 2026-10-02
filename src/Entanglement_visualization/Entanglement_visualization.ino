@@ -4,9 +4,11 @@
 using namespace Qbead;
 
 Qbead::Qbead bead;
+
 int c_tap = 0;
-int setVisual = 0;
-uint32_t lastTick = 0;
+uint8_t setVisual = 0;
+
+uint32_t lastContourUpdate = 0;
 bool stateSwap = false;
 
 #define NORTH_POLE_IDX 0
@@ -19,6 +21,7 @@ struct PixelAxis
     float y;
     float z;
 };
+
 struct HSVBand
 {
     uint16_t hue;
@@ -51,78 +54,116 @@ static bool gammaCorrect = true;
 
 PixelAxis pixelLUT[NUM_PIXELS];
 
+void resetBead();
+void loadPreparedVisuals(uint8_t visual);
+void activateVisual(uint8_t visual);
+void updateVisual();
+
 uint32_t pauliColorMap(float geomInProd)
 {
+    const float mag = fabsf(geomInProd);
 
-    float mag = geomInProd;
-    if (geomInProd <= 0)
-        mag *= -1;
-    int idx = 0.0f;
+    uint8_t idx;
+
     if (mag < 0.05f)
-        idx = 0; // ~0.0 (orthogonal to axis)
+    {
+        idx = 0;
+    }
     else if (mag < 0.25f)
-        idx = 1; // ~0.13 (small angle off orthognal)
-    else if (mag < 0.7f)
-        idx = 2; // ~0.50 (45deg)
+    {
+        idx = 1;
+    }
+    else if (mag < 0.70f)
+    {
+        idx = 2;
+    }
     else if (mag < 0.95f)
-        idx = 3; // ~0.87 (smal angle off parallel)
+    {
+        idx = 3;
+    }
     else
-        idx = 4; // ~1.00 (parallel to axis)
-    uint8_t rev_idx = 4 - idx;
-    HSVBand band_HSV = (geomInProd >= 0.0f) ? bandsRedYellow[rev_idx] : bandsGreenYellow[rev_idx];
-    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
+    {
+        idx = 4;
+    }
+
+    const uint8_t revIdx = 4 - idx;
+
+    const HSVBand bandHSV =
+        (geomInProd >= 0.0f)
+            ? bandsRedYellow[revIdx]
+            : bandsGreenYellow[revIdx];
+
+    return Adafruit_NeoPixel::ColorHSV(
+        bandHSV.hue,
+        bandHSV.sat,
+        bandHSV.val);
 }
 
 uint32_t entanglementColorMap(float geomInProd)
 {
-    float mag = geomInProd;
-    if (geomInProd <= 0)
-        mag *= -1;
-    int idx = 0.0f;
+    const float mag = fabsf(geomInProd);
+
+    uint8_t idx;
+
     if (mag < 0.05f)
-        idx = 4; // ~0.0 (orthogonal to axis)
+    {
+        idx = 4;
+    }
     else if (mag < 0.25f)
-        idx = 3; // ~0.13 (small angle off orthognal)
-    else if (mag < 0.7f)
-        idx = 2; // ~0.50 (45deg)
+    {
+        idx = 3;
+    }
+    else if (mag < 0.70f)
+    {
+        idx = 2;
+    }
     else if (mag < 0.95f)
-        idx = 1; // ~0.87 (smal angle off parallel)
+    {
+        idx = 1;
+    }
     else
+    {
         idx = 0;
-    //
-    HSVBand band_HSV = bandsBlueYellow[idx];
-    return Adafruit_NeoPixel::ColorHSV(band_HSV.hue, band_HSV.sat, band_HSV.val);
+    }
+
+    const HSVBand bandHSV = bandsBlueYellow[idx];
+
+    return Adafruit_NeoPixel::ColorHSV(
+        bandHSV.hue,
+        bandHSV.sat,
+        bandHSV.val);
 }
 
 void showContourBands(const Qbead::BlochVector &arbAxis, bool shared)
 {
-    float x = 0.0f;
-    float y = 0.0f;
-    float z = 0.0f;
-    float sum = 0.0f;
-
     bead.clear();
 
-    for (int p_i = 0; p_i < NUM_PIXELS; p_i++)
+    for (int pixelIndex = 0; pixelIndex < NUM_PIXELS; pixelIndex++)
     {
-        // in-product with pixel's basis unit vecs
-        x = pixelLUT[p_i].x * arbAxis.x;
-        y = pixelLUT[p_i].y * arbAxis.y;
-        z = pixelLUT[p_i].z * arbAxis.z;
-        sum = x + y + z;
-        uint32_t color = 0;
+        const float dotProduct =
+            pixelLUT[pixelIndex].x * arbAxis.x +
+            pixelLUT[pixelIndex].y * arbAxis.y +
+            pixelLUT[pixelIndex].z * arbAxis.z;
+
+        uint32_t pixelColour;
+
         if (shared)
         {
-            color = entanglementColorMap(sum);
+            pixelColour = entanglementColorMap(dotProduct);
         }
         else
         {
-            color = pauliColorMap(sum);
+            pixelColour = pauliColorMap(dotProduct);
         }
-        color = gammaCorrect ? Adafruit_NeoPixel::gamma32(color) : color;
 
-        bead.pixels.setPixelColor(p_i, color);
+        if (gammaCorrect)
+        {
+            pixelColour = Adafruit_NeoPixel::gamma32(pixelColour);
+        }
+
+        bead.pixels.setPixelColor(pixelIndex, pixelColour);
     }
+
     bead.show();
 }
 
@@ -148,66 +189,113 @@ void showYellowBlackHalves()
     bead.show();
 }
 
-void loadPreparedVisuals(uint8_t stateNumber)
+void resetBead()
 {
-    BlochVector up(0, 0);
-    BlochVector down(180, 0);
-    BlochVector plusState(90, 0);
-    uint32_t blue = color(0, 0, 255);
-    uint32_t red = color(255, 0, 0);
+    bead.clearStates();
+    bead.clear();
+    bead.show();
+}
 
-    if (stateNumber == 1)
+void loadPreparedVisuals(uint8_t visual)
+{
+    const BlochVector up(0, 0);
+
+    switch (visual)
     {
-        bead.addState(up);
-        bead.addState(down);
-        bead.setBloch_deg(up, blue);
-        bead.setBloch_deg(down, red);
-        bead.show();
+    case 1:
+    {
+        bead.applyPreparedState(1);
+        bead.displayCurrentStatesStatic();
+        break;
     }
-    if (stateNumber == 2)
+
+    case 2:
     {
-        if (stateSwap)
-        {
-            bead.setBloch_deg(up, blue);
-        }
-        else
-        {
-            bead.setBloch_deg(down, red);
-        }
-        stateSwap = !stateSwap;
-        bead.show();
+        bead.applyPreparedState(1);
+
+        bead.cyclingIndex = 0;
+        bead.lastChange = 0;
+
+        // Shows the first state immediately.
+        bead.displayCurrentStatesCycling();
+        break;
     }
-    if (stateNumber == 3)
+
+    case 3:
     {
-        if (stateSwap)
-        {
-            showContourBands(up, false);
-        }
-        else
-        {
-            showContourBands(up, true);
-        }
-        stateSwap = !stateSwap;
+        stateSwap = false;
+        lastContourUpdate = 0;
+
+        // First frame: shared/entanglement colour map.
+        showContourBands(up, true);
+        break;
     }
-    if (stateNumber == 4)
+
+    case 4:
     {
-        Serial.println("Showing yellow/black split sphere");
         showYellowBlackHalves();
+        break;
+    }
+
+    default:
+    {
+        break;
+    }
+    }
+}
+
+void activateVisual(uint8_t visual)
+{
+    if (setVisual == visual)
+    {
+        return;
+    }
+
+    setVisual = visual;
+
+    resetBead();
+
+    loadPreparedVisuals(setVisual);
+}
+
+void updateVisual()
+{
+    if (setVisual == 2)
+    {
+        bead.displayCurrentStatesCycling();
+        return;
+    }
+
+    if (setVisual == 3)
+    {
+        const uint32_t now = millis();
+
+        if (now - lastContourUpdate < 400)
+        {
+            return;
+        }
+
+        lastContourUpdate = now;
+
+        const BlochVector up(0, 0);
+
+        stateSwap = !stateSwap;
+
+        showContourBands(up, stateSwap);
     }
 }
 
 void initPixelLUT(const Qbead::Qbead &bead)
 {
-    // Current physical Qbead pixel/index convention.
     pixelLUT[NORTH_POLE_IDX] = {0.0f, 0.0f, -1.0f};
     pixelLUT[SOUTH_POLE_IDX] = {0.0f, 0.0f, 1.0f};
 
     const int pixelsPerLeg = bead.nsections - 1;
 
-    // First physical leg: pixel order runs from south toward north.
     for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
     {
-        float theta = 180.0f - thetaIndex * bead.theta_quant;
+        const float theta =
+            180.0f - thetaIndex * bead.theta_quant;
 
         pixelLUT[thetaIndex] = {
             Qbead::sin_deg(theta),
@@ -215,21 +303,20 @@ void initPixelLUT(const Qbead::Qbead &bead)
             Qbead::cos_deg(theta)};
     }
 
-    // Remaining physical legs: theta runs from north toward south.
     for (int phiIndex = 1; phiIndex < bead.nlegs; phiIndex++)
     {
-        float phi = phiIndex * bead.phi_quant;
+        const float phi = phiIndex * bead.phi_quant;
 
         for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
         {
-            float theta = thetaIndex * bead.theta_quant;
+            const float theta = thetaIndex * bead.theta_quant;
 
-            int pixelIndex =
+            const int pixelIndex =
                 7 +
                 (phiIndex - 1) * pixelsPerLeg +
                 (thetaIndex - 1);
 
-            float sinTheta = Qbead::sin_deg(theta);
+            const float sinTheta = Qbead::sin_deg(theta);
 
             pixelLUT[pixelIndex] = {
                 Qbead::cos_deg(phi) * sinTheta,
@@ -248,33 +335,28 @@ void setup()
     resetBead();
 }
 
-void resetBead()
-{
-    bead.innerStateCount = 0;
-    bead.clear();
-    bead.show();
-}
-
 void loop()
 {
     bead.readIMU(false);
     if (bead.wasTapped())
     {
         c_tap++;
+        Serial.print("Tap count: ");
         Serial.println(c_tap);
     }
 
     BLEManager::DataPacket packet = bead.takeLatestPacket();
     if (packet.type == BLEManager::CommandType::PreparedVisualizations)
     {
-        Serial.println("state update received");
-        resetBead();
-        loadPreparedVisuals(packet.value);
+        Serial.print("Received visual: ");
+        Serial.println(packet.value);
+        activateVisual(packet.value);
     }
     else if (packet.type == BLEManager::CommandType::ClearStates)
     {
-        Serial.println("clear command received");
-        bead.innerStateCount = 0;
+        Serial.println("Received clear command");
+        c_tap = 0;
+        setVisual = 0;
         resetBead();
     }
     else
@@ -282,55 +364,59 @@ void loop()
         if (c_tap > 25)
         {
             c_tap = 0;
-            bead.ble.sendData(BLEManager::CommandType::ClearStates, 0, 0, 0);
-            resetBead();
+            bead.ble.sendData(
+                BLEManager::CommandType::ClearStates,
+                0, 0, 0);
+
             setVisual = 0;
-        }
-        else if (c_tap >= 20 && setVisual < 4)
-        {
-            setVisual = 4;
-            Serial.println("Setting entanglement with split-QBEADS");
             resetBead();
-            bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 4, 0, 0);
-            loadPreparedVisuals(4);
         }
-        else if (c_tap >= 15 && setVisual < 4)
+        else if (c_tap >= 20)
         {
-            uint32_t current = millis();
-            uint32_t deltaTime = current - lastTick;
-
-            if (deltaTime >= 400 || setVisual < 3)
+            if (setVisual != 4)
             {
-                lastTick = current;
-                setVisual = 3;
-                Serial.println("Setting entanglement with QBEADS");
-                resetBead();
-                bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 3, 0, 0);
-                loadPreparedVisuals(3);
+                Serial.println("Selecting visual 4");
+                activateVisual(4);
+                bead.ble.sendData(
+                    BLEManager::CommandType::PreparedVisualizations,
+                    4, 0, 0);
             }
         }
-        else if (c_tap >= 10 && setVisual < 3)
+        else if (c_tap >= 15)
         {
-            uint32_t current = millis();
-            uint32_t deltaTime = current - lastTick;
-
-            if (deltaTime >= 400 || setVisual < 2)
+            if (setVisual != 3)
             {
-                lastTick = current;
-                setVisual = 2;
-                Serial.println("Setting entanglement with cycling");
-                resetBead();
-                bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 2, 0, 0);
-                loadPreparedVisuals(2);
+                Serial.println("Selecting visual 3");
+                activateVisual(3);
+                bead.ble.sendData(
+                    BLEManager::CommandType::PreparedVisualizations,
+                    3, 0, 0);
             }
         }
-        else if (c_tap >= 5 && setVisual < 1)
+        else if (c_tap >= 10)
         {
-            setVisual = 1;
-            Serial.println("Setting entanglement with colours");
-            resetBead();
-            loadPreparedVisuals(1);
-            bead.ble.sendData(BLEManager::CommandType::PreparedVisualizations, 1, 0, 0);
+            if (setVisual != 2)
+            {
+                Serial.println("Selecting visual 2");
+                activateVisual(2);
+                bead.ble.sendData(
+                    BLEManager::CommandType::PreparedVisualizations,
+                    2, 0, 0);
+            }
+        }
+        else if (c_tap >= 5)
+        {
+            if (setVisual != 1)
+            {
+                Serial.println("Selecting visual 1");
+                activateVisual(1);
+                bead.ble.sendData(
+                    BLEManager::CommandType::PreparedVisualizations,
+                    1, 0, 0);
+            }
         }
     }
+
+    // Animated modes are advanced here, once per main-loop pass
+    updateVisual();
 }
