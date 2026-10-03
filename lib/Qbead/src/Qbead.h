@@ -13,6 +13,50 @@
 
 namespace Qbead
 {
+    // TODO: REMOVE AND REFACTOR
+    struct ShakeDetector {
+    float g[3] = {0, 0, 1};
+    bool  init = false;
+    int   lastSign = 0, swings = 0;
+    uint32_t lastSwingMs = 0;
+
+    // r: raw accel in g, dt: seconds. Returns true once per shake.
+    bool update(const float r[3], float dt, uint32_t nowMs) {
+      const float TAU = 1.0f;          // gravity estimator time constant
+      const float THR = 0.8f;          // g, axial swing threshold
+      const float PERP_MAX_RATIO = 0.6f;
+      const uint32_t GAP_MS = 250;     // max time between swings
+      const int SWINGS_NEEDED = 2;
+
+      if (!init) { for (int i = 0; i < 3; i++) g[i] = r[i]; init = true; }
+
+      float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
+      float gh[3] = {g[0]/gm, g[1]/gm, g[2]/gm};
+      float lin[3] = {r[0]-g[0], r[1]-g[1], r[2]-g[2]};
+      float par = lin[0]*gh[0] + lin[1]*gh[1] + lin[2]*gh[2];
+      float pe[3] = {lin[0]-par*gh[0], lin[1]-par*gh[1], lin[2]-par*gh[2]};
+      float perp = sqrtf(pe[0]*pe[0] + pe[1]*pe[1] + pe[2]*pe[2]);
+
+      bool moving = (swings > 0);
+      float a = moving ? dt / (4*TAU) : dt / TAU;   // slow the estimator mid-shake
+      for (int i = 0; i < 3; i++) g[i] += a * (r[i] - g[i]);
+
+      if (nowMs - lastSwingMs > GAP_MS) { swings = 0; lastSign = 0; }
+
+      if (fabsf(par) > THR && perp < PERP_MAX_RATIO * fabsf(par)) {
+        int s = par > 0 ? 1 : -1;
+        if (s != lastSign) {
+          swings++; lastSign = s; lastSwingMs = nowMs;
+          if (swings >= SWINGS_NEEDED) { swings = 0; lastSign = 0; return true; }
+        }
+      }
+      return false;
+    }
+
+    int getSwings(){
+      return swings;
+    }
+  };
 
   class Qbead
   {
@@ -35,13 +79,16 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz)
+          sx(sx), sy(sy), sz(sz),
+          // TODO: REFACTOR
+          shake()
     {
     }
 
     static Qbead *callbackTarget; // we need a global singleton static instance because bluefruit callbacks do not support context variables -- thankfully this is fine because there is indeed only one Qbead in existence at any time
 
     LSM6DS3 imu;
+    ShakeDetector shake; // TODO
     Adafruit_NeoPixel pixels;
     BLEManager::BLEManager ble;
     BlochVector innerStates[INNER_STATE_COUNT];
@@ -58,7 +105,8 @@ namespace Qbead
     float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
     float t_acc, p_acc;                             // theta and phi according to gravity
-    float T_imu;                                    // last update from the IMU
+    //float T_imu;                                    // last update from the IMU TODO
+    uint32_t T_imu;
     bool tapped = false;
     bool tappedrecorded = false;
     uint32_t stateColours[INNER_STATE_COUNT] = {
@@ -71,6 +119,9 @@ namespace Qbead
     };
     uint32_t cyclingIndex = 0;
     uint32_t lastChange = 0;
+
+
+
 
     void setupIMUTapDetection()
     {
@@ -93,6 +144,7 @@ namespace Qbead
       imu.writeRegister(LSM6DS3_ACC_GYRO_TAP_THS_6D, thrshold_setting);
 
       // Only do single tap detection. Seems like the naming is incorrect?
+      // TODO: INDEED INCORRECT, Library wrapper implemented reverse from spec sheet
       imu.writeRegister(LSM6DS3_ACC_GYRO_WAKE_UP_THS, LSM6DS3_ACC_GYRO_SINGLE_DOUBLE_TAP_DOUBLE_TAP);
 
       // Single-tap interrupt driven to pin 1
@@ -311,6 +363,8 @@ namespace Qbead
       callbackTarget->tapped = true;
     }
 
+
+
     void readIMU(bool print = true)
     {
       rbuffer[0] = imu.readFloatAccelX();
@@ -322,11 +376,11 @@ namespace Qbead
 
       float rawmag2 = rx * rx + ry * ry + rz * rz;
 
-      float T_new = micros();
-      float delta = T_new - T_imu;
+      uint32_t T_new = micros(); //TODO: Can lose resolution after ~3-4h
+      uint32_t delta = T_new - T_imu;
       T_imu = T_new;
       const float T = 100000; // 100 ms // TODO make the filter timeconstant configurable
-      if (delta > 100000)
+      if (delta > T)
       {
         x = rx;
         y = ry;
@@ -347,6 +401,18 @@ namespace Qbead
       {
         p_acc += 360;
       } // to bring it to [0,360] range
+
+      // TODO
+      float r[3];
+      r[0] = rx;
+      r[1] = rx;
+      r[2] = rx;
+      if (shake.update(r, delta*1e-6f, T_new)){
+        Serial.println("SHAKEN");
+      }
+      Serial.print("Swings: ");
+      Serial.println(shake.getSwings());
+      // TODO
 
       if (!tappedrecorded && tapped)
       {
