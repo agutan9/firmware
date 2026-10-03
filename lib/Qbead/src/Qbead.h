@@ -185,6 +185,11 @@ namespace Qbead
 
       setupIMUTapDetection();
 
+      // TODO
+      uint8_t id; imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
+      Serial.println(id, HEX);
+      // TODO
+
       ble.beginDualRole();
     }
 
@@ -417,9 +422,14 @@ namespace Qbead
       if (!tappedrecorded && tapped)
       {
         tappedrecorded = true;
-        whentapped_buffer[0] = imu.readFloatAccelX();
-        whentapped_buffer[1] = imu.readFloatAccelY();
-        whentapped_buffer[2] = imu.readFloatAccelZ();
+        // TODO: Why re-read this info without it being ex-LPF'ed???
+        //whentapped_buffer[0] = imu.readFloatAccelX();
+        //whentapped_buffer[1] = imu.readFloatAccelY();
+        //whentapped_buffer[2] = imu.readFloatAccelZ();
+
+        whentapped_buffer[0] = x;
+        whentapped_buffer[1] = y;
+        whentapped_buffer[2] = z;
       }
 
       if (print)
