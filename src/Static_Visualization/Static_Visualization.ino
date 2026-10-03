@@ -8,6 +8,13 @@ Qbead::Qbead bead;
 #define NORTH_POLE_IDX 0
 #define SOUTH_POLE_IDX 6
 #define NUM_PIXELS 62
+static constexpr uint32_t ENTANGLED_STATE = 1;
+
+// How long to keep the entangled-state display before clearing it.
+static constexpr uint32_t ENTANGLED_DISPLAY_MS = 15000;
+
+bool entangledDisplayActive = false;
+uint32_t entangledAtMs = 0;
 
 struct PixelAxis
 {
@@ -65,21 +72,88 @@ void resetBead()
     bead.clear();
     bead.show();
 }
-
 void measure()
 {
-    Serial.println("Tapped! Measuring...");
+    const uint32_t outcome = random(2); // 0 or 1
+
+    Serial.print("Tapped! Measuring outcome |");
+    Serial.print(outcome);
+    Serial.println(">");
+
     bead.ble.sendData(
-                BLEManager::CommandType::AddState, //TODO: add a CommandType for Measure
-                0, 0, 0);
-}
+        BLEManager::CommandType::Measure,
+        outcome,
+        0,
+        0);
 
-void collapse()
+    setCollapsedState(outcome);
+    entangledDisplayActive = false;
+}
+void setCollapsedState(uint32_t outcome)
 {
-    Serial.println("Received tap command! Measuring the other QBead...");
+    bead.clearStates();
+
+    BlochVector up(0, 0);
+    BlochVector down(180, 0);
+
+    if (outcome == 1)
+    {
+        bead.addState(up);
+    }
+    else
+    {
+        bead.addState(down);
+    }
+
+    bead.displayCurrentStatesStatic();
 }
 
-// ---------------------------------------------
+void collapse(uint32_t remoteOutcome)
+{
+    Serial.print("[MEASURE] Remote outcome: |");
+    Serial.print(remoteOutcome);
+    Serial.print(">, local outcome: |");
+    Serial.print(remoteOutcome);
+    Serial.println(">");
+
+    setCollapsedState(remoteOutcome);
+
+    entangledDisplayActive = false;
+}
+
+void showIdle()
+{
+    // A dim purple marker at the north pole means "ready".
+    bead.clear();
+    bead.setBloch_deg(0, 0, color(15, 0, 15));
+    bead.show();
+}
+
+void showLocalRequestPending()
+{
+    bead.clear();
+    bead.setBloch_deg(0, 0, color(0, 0, 80));
+    bead.show();
+}
+
+void showRemoteRequestPending()
+{
+    bead.clear();
+    bead.setBloch_deg(180, 0, color(80, 0, 80));
+    bead.show();
+}
+
+void showEntanglementSuccess()
+{
+    bead.displayCurrentStatesStatic();
+}
+
+void showTimeout()
+{
+    bead.clear();
+    bead.setBloch_deg(90, 0, color(80, 0, 0));
+    bead.show();
+}
 
 void setup()
 {
@@ -88,22 +162,51 @@ void setup()
     initPixelLUT(bead);
     bead.testPixels();
     resetBead();
-
-    bead.applyPreparedState(1);
-    bead.displayCurrentStatesStatic();
+    showIdle();
 }
 
 void loop()
 {
     bead.readIMU(false);
-    if (bead.wasTapped())
+
+    // First handle a measurement initiated by the other Qbead.
+    BLEManager::DataPacket packet = bead.takeLatestPacket();
+
+    if (packet.type == BLEManager::CommandType::Measure &&
+        entangledDisplayActive)
     {
-        measure();
+        collapse(packet.value);
     }
 
-    BLEManager::DataPacket packet = bead.takeLatestPacket();
-    if (packet.type == BLEManager::CommandType::AddState) // TODO: change this to a new CommandType for Measure
+    if (!entangledDisplayActive)
     {
-        collapse();
+        // Taps are interpreted as entanglement requests here.
+        if (bead.entangle(ENTANGLED_STATE))
+        {
+            entangledDisplayActive = true;
+            entangledAtMs = millis();
+
+            showEntanglementSuccess();
+
+            Serial.println("[SUCCESS] Entangled.");
+        }
+    }
+    else
+    {
+        // Taps are interpreted as measurements here.
+        if (bead.wasTapped())
+        {
+            measure();
+        }
+    }
+
+    if (entangledDisplayActive &&
+        (uint32_t)(millis() - entangledAtMs) >= ENTANGLED_DISPLAY_MS)
+    {
+        entangledDisplayActive = false;
+        bead.clearStates();
+        showIdle();
+
+        Serial.println("[INFO] Entangled state timed out.");
     }
 }
