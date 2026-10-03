@@ -12,22 +12,26 @@ namespace BLEManager
     Tap = 1,
     AddState = 2,
     ClearStates = 3,
-    PreparedVisualizations = 4, // 1 Bell0, 
+    PreparedVisualizations = 4, // 1 Bell0,
+    Entangle = 5,
   };
 
   struct DataPacket
   {
-    CommandType type; 
+    CommandType type;
     uint32_t value;
     uint32_t theta;
-    uint32_t phi;   
+    uint32_t phi;
   };
 
   class BLEManager
   {
   private:
     static BLEManager *instance;
-    DataPacket lastPacket;
+    DataPacket lastPacket = {CommandType::None, 0, 0, 0};
+
+    volatile bool entangleRequestPending = false;
+    volatile uint32_t entangleRequestReceivedAtMs = 0;
 
     void setupPeripheral()
     {
@@ -45,7 +49,7 @@ namespace BLEManager
       qBeadDataChar.setFixedLen(sizeof(DataPacket));
       qBeadDataChar.begin();
 
-      DataPacket initial = {CommandType::None, 0};
+      DataPacket initial = {CommandType::None, 0, 0, 0};
       qBeadDataChar.write(&initial, sizeof(initial));
     }
 
@@ -79,7 +83,7 @@ namespace BLEManager
 
     BLEClientService qBeadClientService;
     BLEService bleservice;
-    
+
     BLEClientCharacteristic qBeadDataClient;
     BLECharacteristic qBeadDataChar;
 
@@ -97,13 +101,28 @@ namespace BLEManager
 
     bool takePacket(DataPacket &packet)
     {
-      if (lastPacket.type == CommandType::Tap)
+      if (lastPacket.type == CommandType::None)
       {
         return false;
       }
 
       packet = lastPacket;
-      lastPacket = {CommandType::Tap, 0, 0, 0};
+      lastPacket = {CommandType::None, 0, 0, 0};
+      return true;
+    }
+
+    bool takeEntangleRequest(uint32_t &receivedAtMs)
+    {
+      if (!entangleRequestPending)
+      {
+        return false;
+      }
+
+      noInterrupts();
+      receivedAtMs = entangleRequestReceivedAtMs;
+      entangleRequestPending = false;
+      interrupts();
+
       return true;
     }
 
@@ -248,6 +267,17 @@ namespace BLEManager
       DataPacket packet;
       memcpy(&packet, data, sizeof(packet));
       instance->lastPacket = packet;
+
+      // Entanglement requests are handled as a dedicated event, rather than
+      // relying on whichever packet happened to be received most recently.
+      // Otherwise it would be difficult to set precise timewindow for an attempt.
+      if (packet.type == CommandType::Entangle)
+      {
+        instance->entangleRequestReceivedAtMs = millis();
+        instance->entangleRequestPending = true;
+
+        Serial.println("[INFO]{BLE} Received entanglement request");
+      }
     }
     static void disconnect_callback(uint16_t conn_handle, uint8_t reason)
     {
@@ -259,7 +289,7 @@ namespace BLEManager
     }
 
     void sendData(CommandType type, uint32_t value, uint32_t theta,
-    uint32_t phi)
+                  uint32_t phi)
     {
       DataPacket packet = {type, value, theta, phi};
 
