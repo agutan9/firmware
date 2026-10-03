@@ -14,6 +14,7 @@ namespace BLEManager
     ClearStates = 3,
     PreparedVisualizations = 4, // 1 Bell0,
     Entangle = 5,
+    Measure = 6,
   };
 
   struct DataPacket
