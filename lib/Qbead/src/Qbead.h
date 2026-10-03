@@ -14,47 +14,37 @@
 namespace Qbead
 {
     // TODO: REMOVE AND REFACTOR
-    struct ShakeDetector {
-    float g[3] = {0, 0, 1};
-    bool  init = false;
-    int   lastSign = 0, swings = 0;
-    uint32_t lastSwingMs = 0;
+  struct ShakeDetector {
+    float g[3]; bool init = false;
+    uint32_t tPos = 0, tNeg = 0, tFire = 0;
+    bool havePos = false, haveNeg = false;
 
-    // r: raw accel in g, dt: seconds. Returns true once per shake.
     bool update(const float r[3], float dt, uint32_t nowMs) {
-      const float TAU = 1.0f;          // gravity estimator time constant
-      const float THR = 0.8f;          // g, axial swing threshold
-      const float PERP_MAX_RATIO = 0.6f;
-      const uint32_t GAP_MS = 250;     // max time between swings
-      const int SWINGS_NEEDED = 2;
-
-      if (!init) { for (int i = 0; i < 3; i++) g[i] = r[i]; init = true; }
+      const float TAU = 1.0f, THR = 0.8f, PERP_RATIO = 0.6f;
+      const uint32_t WINDOW_MS = 300, COOLDOWN_MS = 500;
+      if (!init) { memcpy(g, r, sizeof g); init = true; }
 
       float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
-      float gh[3] = {g[0]/gm, g[1]/gm, g[2]/gm};
+      float h[3]   = {g[0]/gm, g[1]/gm, g[2]/gm};
       float lin[3] = {r[0]-g[0], r[1]-g[1], r[2]-g[2]};
-      float par = lin[0]*gh[0] + lin[1]*gh[1] + lin[2]*gh[2];
-      float pe[3] = {lin[0]-par*gh[0], lin[1]-par*gh[1], lin[2]-par*gh[2]};
+      float par  = lin[0]*h[0] + lin[1]*h[1] + lin[2]*h[2];
+      float pe[3] = {lin[0]-par*h[0], lin[1]-par*h[1], lin[2]-par*h[2]};
       float perp = sqrtf(pe[0]*pe[0] + pe[1]*pe[1] + pe[2]*pe[2]);
 
-      bool moving = (swings > 0);
-      float a = moving ? dt / (4*TAU) : dt / TAU;   // slow the estimator mid-shake
+      float a = dt / ((havePos || haveNeg) ? 4*TAU : TAU);   // slow down mid-shake
       for (int i = 0; i < 3; i++) g[i] += a * (r[i] - g[i]);
 
-      if (nowMs - lastSwingMs > GAP_MS) { swings = 0; lastSign = 0; }
+      if (fabsf(par) > THR && perp < PERP_RATIO * fabsf(par)) {
+        if (par > 0) { tPos = nowMs; havePos = true; }
+        else         { tNeg = nowMs; haveNeg = true; }
+      }
+      if (havePos && nowMs - tPos > WINDOW_MS) havePos = false;
+      if (haveNeg && nowMs - tNeg > WINDOW_MS) haveNeg = false;
 
-      if (fabsf(par) > THR && perp < PERP_MAX_RATIO * fabsf(par)) {
-        int s = par > 0 ? 1 : -1;
-        if (s != lastSign) {
-          swings++; lastSign = s; lastSwingMs = nowMs;
-          if (swings >= SWINGS_NEEDED) { swings = 0; lastSign = 0; return true; }
-        }
+      if (havePos && haveNeg && nowMs - tFire > COOLDOWN_MS) {
+        havePos = haveNeg = false; tFire = nowMs; return true;
       }
       return false;
-    }
-
-    int getSwings(){
-      return swings;
     }
   };
 
@@ -495,8 +485,6 @@ namespace Qbead
       if (shake.update(r, delta*1e-6f, T_new)){
         Serial.println("SHAKEN");
       }
-      Serial.print("Swings: ");
-      Serial.println(shake.getSwings());
       // TODO
 
       if (!tappedrecorded && tapped)
