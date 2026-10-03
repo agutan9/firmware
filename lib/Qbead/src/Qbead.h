@@ -61,6 +61,12 @@ namespace Qbead
     float T_imu;                                    // last update from the IMU
     bool tapped = false;
     bool tappedrecorded = false;
+
+    bool localEntangleRequestPending = false;
+    uint32_t localEntangleRequestStartedAtMs = 0;
+    bool remoteEntangleRequestPending = false;
+    uint32_t remoteEntangleRequestReceivedAtMs = 0;
+
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
         color(255, 0, 0),   // Red
@@ -289,12 +295,65 @@ namespace Qbead
       return wasTapped;
     }
 
+    bool entangle(uint32_t state)
+    {
+      const uint32_t now = millis();
+
+      // Capture a newly received remote request.
+      uint32_t receivedAtMs;
+      if (ble.takeEntangleRequest(receivedAtMs))
+      {
+        remoteEntangleRequestPending = true;
+        remoteEntangleRequestReceivedAtMs = receivedAtMs;
+
+        Serial.println("[INFO]{ENTANGLE} Remote request queued");
+      }
+
+      // Capture a newly detected local tap and send our request.
+      if (wasTapped())
+      {
+        localEntangleRequestPending = true;
+        localEntangleRequestStartedAtMs = now;
+
+        ble.sendData(BLEManager::CommandType::Entangle, 0, 0, 0);
+
+        Serial.println("[INFO]{ENTANGLE} Local tap; request sent");
+      }
+
+      // Drop expired requests.
+      if (localEntangleRequestPending &&
+          (uint32_t)(now - localEntangleRequestStartedAtMs) > ENTANGLE_WINDOW_MS)
+      {
+        localEntangleRequestPending = false;
+        Serial.println("[INFO]{ENTANGLE} Local request timed out");
+      }
+
+      if (remoteEntangleRequestPending &&
+          (uint32_t)(now - remoteEntangleRequestReceivedAtMs) > ENTANGLE_WINDOW_MS)
+      {
+        remoteEntangleRequestPending = false;
+        Serial.println("[INFO]{ENTANGLE} Remote request timed out");
+      }
+
+      // Entangle only if both requests are presently valid.
+      if (localEntangleRequestPending && remoteEntangleRequestPending)
+      {
+        localEntangleRequestPending = false;
+        remoteEntangleRequestPending = false;
+
+        Serial.println("[INFO]{ENTANGLE} Requests matched");
+        return applyPreparedState(state);
+      }
+
+      return false;
+    }
+
     BLEManager::DataPacket takeLatestPacket()
     {
       BLEManager::DataPacket packet;
       if (!ble.takePacket(packet))
       {
-        return {BLEManager::CommandType::None, 0};
+        return {BLEManager::CommandType::None, 0, 0, 0};
       }
       return packet;
     }
@@ -421,7 +480,7 @@ namespace Qbead
       innerStateCount = 0;
     }
 
-    void applyPreparedState(uint32_t state)
+    bool applyPreparedState(uint32_t state)
     {
       BlochVector up(0, 0);
       BlochVector down(180, 0);
@@ -430,13 +489,16 @@ namespace Qbead
         this->clearStates();
         this->addState(up);
         this->addState(down);
+        return true;
       }
       else if (state == 2)
       {
         this->clearStates();
         this->addState(down);
         this->addState(up);
+        return true;
       }
+      return false;
     }
 
     void displayCurrentStatesStatic()
