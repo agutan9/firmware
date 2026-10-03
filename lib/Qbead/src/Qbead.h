@@ -15,39 +15,48 @@ namespace Qbead
 {
     // TODO: REMOVE AND REFACTOR
   struct ShakeDetector {
-    float g[3]; bool init = false;
     uint32_t tPos = 0, tNeg = 0, tFire = 0;
     bool havePos = false, haveNeg = false;
-
-    // NEED RAW r for fast processing 
-    bool update(const float r[3], float dt, uint32_t nowMs) {
-      const float TAU = 1.0f, THR = 0.8f, PERP_RATIO = 0.6f;
+    bool active() const { return havePos || haveNeg; }
+    
+    bool update(const float r[3], const float g[3], uint32_t nowMs) {
+      const float THR = 0.8f, PERP_RATIO = 0.6f;
       const uint32_t WINDOW_MS = 300, COOLDOWN_MS = 500;
-      if (!init) { memcpy(g, r, sizeof g); init = true; }
-
       float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
       float h[3]   = {g[0]/gm, g[1]/gm, g[2]/gm};
       float lin[3] = {r[0]-g[0], r[1]-g[1], r[2]-g[2]};
       float par  = lin[0]*h[0] + lin[1]*h[1] + lin[2]*h[2];
       float pe[3] = {lin[0]-par*h[0], lin[1]-par*h[1], lin[2]-par*h[2]};
       float perp = sqrtf(pe[0]*pe[0] + pe[1]*pe[1] + pe[2]*pe[2]);
-
-      float a = dt / ((havePos || haveNeg) ? 4*TAU : TAU);   // slow down mid-shake
-      for (int i = 0; i < 3; i++) g[i] += a * (r[i] - g[i]);
-
+    
       if (fabsf(par) > THR && perp < PERP_RATIO * fabsf(par)) {
         if (par > 0) { tPos = nowMs; havePos = true; }
         else         { tNeg = nowMs; haveNeg = true; }
       }
       if (havePos && nowMs - tPos > WINDOW_MS) havePos = false;
       if (haveNeg && nowMs - tNeg > WINDOW_MS) haveNeg = false;
-
       if (havePos && haveNeg && nowMs - tFire > COOLDOWN_MS) {
         havePos = haveNeg = false; tFire = nowMs; return true;
       }
       return false;
     }
   };
+  struct GravityTracker {
+    float g[3] = {0, 0, 1}; bool init = false;
+    void update(const float a[3], const float w_dps[3], float dt) {   // chip frame!
+      const float D2R = 0.0174533f, TAU = 1.5f;
+      if (!init) { memcpy(g, a, sizeof g); init = true; return; }
+      float w[3] = {w_dps[0]*D2R, w_dps[1]*D2R, w_dps[2]*D2R};
+      float c[3] = {w[1]*g[2]-w[2]*g[1], w[2]*g[0]-w[0]*g[2], w[0]*g[1]-w[1]*g[0]};
+      for (int i = 0; i < 3; i++) g[i] -= c[i]*dt;                    // predict
+      float am  = sqrtf(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
+      float k   = (dt/TAU) * fmaxf(0.f, 1.f - fabsf(am - 1.f)/0.3f);   // trust accel near 1 g
+      for (int i = 0; i < 3; i++) g[i] += k*(a[i] - g[i]);            // correct
+      float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
+      for (int i = 0; i < 3; i++) g[i] /= gm;
+    }
+  };
+  // TODO END
 
   class Qbead
   {
@@ -72,7 +81,8 @@ namespace Qbead
           ix(ix), iy(iy), iz(iz),
           sx(sx), sy(sy), sz(sz),
           // TODO: REFACTOR
-          shake()
+          shake(),
+          gravity()
     {
     }
 
@@ -80,6 +90,7 @@ namespace Qbead
 
     LSM6DS3 imu;
     ShakeDetector shake; // TODO
+    GravityTracker gravity; // TODO
     Adafruit_NeoPixel pixels;
     BLEManager::BLEManager ble;
     BlochVector innerStates[INNER_STATE_COUNT];
@@ -175,6 +186,7 @@ namespace Qbead
       imu.settings.accelRange      = 8;     // ±8 g: no clipping on shakes
       imu.settings.accelSampleRate = 416;
       imu.settings.accelBandWidth  = 400;   // keeps your current 400 Hz analog BW
+      imu.settings.gyroEnabled = true; // maybe off?
       // TODO
 
       Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
