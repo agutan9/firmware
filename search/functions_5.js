@@ -1,0 +1,4 @@
+var searchData=
+[
+  ['loop_0',['loop',['../BLE__bridge_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;BLE_bridge.ino'],['../BLE__reader_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;BLE_reader.ino'],['../Dynamical__Decoupling_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;Dynamical_Decoupling.ino'],['../Dynamical__Decoupling__Bar_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;Dynamical_Decoupling_Bar.ino'],['../Dynamical__Decoupling__Simplified_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;Dynamical_Decoupling_Simplified.ino'],['../IMU__reader_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;IMU_reader.ino'],['../Qbead__MDP_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;Qbead_MDP.ino'],['../Tap__to__Measure_8ino.html#afe461d27b9c48d5921c00d521181f12f',1,'loop():&#160;Tap_to_Measure.ino']]]
+];
