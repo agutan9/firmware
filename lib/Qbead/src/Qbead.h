@@ -19,6 +19,7 @@ namespace Qbead
     uint32_t tPos = 0, tNeg = 0, tFire = 0;
     bool havePos = false, haveNeg = false;
 
+    // NEED RAW r for fast processing 
     bool update(const float r[3], float dt, uint32_t nowMs) {
       const float TAU = 1.0f, THR = 0.8f, PERP_RATIO = 0.6f;
       const uint32_t WINDOW_MS = 300, COOLDOWN_MS = 500;
@@ -115,9 +116,11 @@ namespace Qbead
 
     void setupIMUTapDetection()
     {
+      // TODO already done in begin() using settings struct
       // Turn on the accelerometer
       // Acc = 416Hz (High-Performance mode)
-      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL1_XL, LSM6DS3_ACC_GYRO_ODR_XL_416Hz);
+      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL1_XL, LSM6DS3_ACC_GYRO_ODR_XL_416Hz);
+      // TODO
 
       // Optionally, disable gyroscope to save power
       // imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL2_G, LSM6DS3_ACC_GYRO_ODR_G_POWER_DOWN);
@@ -162,6 +165,15 @@ namespace Qbead
       pixels.begin();
       clear();
       setBrightness(10);
+
+      // TODO
+      // These settings are used by the imu class. Only directly setting the registers as in
+      // setup_IMU_Tap_detection doesn't also schange the settings struct.
+      // While IMU.begin does copy the settings struct
+      imu.settings.accelRange      = 8;     // ±8 g: no clipping on shakes
+      imu.settings.accelSampleRate = 416;
+      imu.settings.accelBandWidth  = 400;   // keeps your current 400 Hz analog BW
+      // TODO
 
       Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
       if (!imu.begin())
@@ -390,8 +402,14 @@ namespace Qbead
       }
       float mag2 = x * x + y * y + z * z;
 
-      t_acc = theta(x, y, z) * 180 / 3.14159;
-      p_acc = phi(x, y) * 180 / 3.14159;
+      // TODO
+      // polar and azimuth angles of the smoothed acceleration vector in the sensor frame
+      // NOT rotational accellerations values. Maybe rename?
+      // t_acc = theta(x, y, z) * 180 / 3.14159;
+      // p_acc = phi(x, y) * 180 / 3.14159;
+      t_acc = theta(x, y, z) * RAD_TO_DEG;
+      p_acc = phi(x, y, z) * RAD_TO_DEG;
+      // TODO
       if (p_acc < 0)
       {
         p_acc += 360;
