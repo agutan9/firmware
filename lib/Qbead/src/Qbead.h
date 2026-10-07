@@ -28,76 +28,6 @@ namespace Qbead
   // alle in-play sphere elementen daarmee offsetten zodat de rotations die je doet voor de callibratie stap
   // geen invloed hebben op de state die je voor je had...
 
-
-  // PR REVIEW: Should these stay as structs or integrate them into the Qbead class?
-  /**
-   * @brief Detects a deliberate shake along a cardinal global axis.
-   *
-   * Each update sample is split into a component along the cardinal shake axis
-   * ("parallel") and a component across it ("perpendicular"), after subtracting
-   * a gravity estimate.
-   * A shake is reported when a positive and a negative excursion along gravity,
-   * each larger than a threshold and each mostly parallel, occur within a short
-   * pairing window.
-   *
-   * Gravity can be filtered internally or supplied by a GravityTracker.
-   * Call update() exactly once per sensor sample.
-   * 
-   */
-  //struct ShakeDetector {
-  //  float gravityEstimate[3] = {0.f, 0.f, 1.f}; // TODO: default constructor
-  //  bool init = false; /**< True once gravityEstimate holds valid data. Set to false to recallibrate (e.g. after a timing gap). */
-  //  bool pos
-//
-  //  float scaxis[3]; 
-  //  float scaxis_atShakeStart[3];
-  //  float vPos = 0, vNeg = 0; // members: largest peak on each side
-  //  uint32_t tPos = 0, tNeg = 0, tFire = 0;
-  //  bool havePos = false, haveNeg = false;
-//
-  //  //ShakeDetector() : 
-  //  // Shake is a periodic signal with
-//
-  //  bool update(const float r[3], float dt, uint32_t nowMs, const float* gExt = nullptr) {
-  //    /* */
-  //    const float INT_TRIGAX_FILTERWINDOW = 1.0f; /**<  Not used when gExt passed.  */
-  //    const float THR = 0.5f; /**< Shake half-period base threshold for acceleration projected amplitude. Default total amp: 2xTHR. Modified by P2P, CONE_RATIO.*/
-  //    const float P2P = 1.9f; /**< Peak-to-Peak acceleration amplitude. TODO: HOW DOES IT RELATE TO THR???*/
-  //    const float CONE_RATIO = 0.45f; /**<  */
-  //    const uint32_t WINDOW_MS = 300; /**< Max time period of shake signal. */
-  //    const uint32_t COOLDOWN_MS = 500; /**<  */
-  //    if (gExt) { memcpy(trigAx, gExt, sizeof trigAx); init = true; }
-  //    else if (!init) { memcpy(trigAx, r, sizeof trigAx); init = true; }
-//
-  //    float gm = sqrtf(trigAx[0]*trigAx[0] + trigAx[1]*trigAx[1] + trigAx[2]*trigAx[2]);
-  //    float h[3]   = {trigAx[0]/gm, trigAx[1]/gm, trigAx[2]/gm};
-  //    float lin[3] = {r[0]-trigAx[0], r[1]-trigAx[1], r[2]-trigAx[2]};
-  //    float par  = lin[0]*h[0] + lin[1]*h[1] + lin[2]*h[2];
-  //    float pe[3] = {lin[0]-par*h[0], lin[1]-par*h[1], lin[2]-par*h[2]};
-  //    float perp = sqrtf(pe[0]*pe[0] + pe[1]*pe[1] + pe[2]*pe[2]);
-//
-  //    if (!gExt) {
-  //      float a = dt / ((havePos || haveNeg) ? 4*INT_TRIGAX_FILTERWINDOW : INT_TRIGAX_FILTERWINDOW); // slow down mid-shake
-  //      for (int i = 0; i < 3; i++) trigAx[i] += a * (r[i] - trigAx[i]);
-  //    }      
-  //    // Expiry windows
-  //    if (havePos && nowMs - tPos > WINDOW_MS) havePos = false;
-  //    if (haveNeg && nowMs - tNeg > WINDOW_MS) haveNeg = false;
-  //    
-  //    bool idle = !(havePos || haveNeg);
-  //    if (fabsf(par) > THR && perp < CONE_RATIO * fabsf(par)) {
-  //      if (idle) memcpy(trigAx_atShakeStart, trigAx, sizeof trigAx); // gravity at the first excursion
-  //      if (par > 0) { if (!havePos || par > vPos) vPos = par; tPos = nowMs; havePos = true; }
-  //      else         { if (!haveNeg || par < vNeg) vNeg = par; tNeg = nowMs; haveNeg = true; }
-  //    }
-//
-  //    if (havePos && haveNeg && (vPos - vNeg) > P2P && nowMs - tFire > COOLDOWN_MS) {
-  //      havePos = haveNeg = false; tFire = nowMs; return true;
-  //    }
-  //    return false;
-  //  }
-  //};
-
   /**
    * @brief Detects a deliberate shake along one axis (currently the vertical, gravity axis).
    *
@@ -138,6 +68,12 @@ namespace Qbead
   struct ShakeDetector {
     /** @name Detection behaviour tunable parameters 
      *  @{ */
+
+    /**
+    * Number of alternating-sign peaks required before a shake is reported.
+    * One stroke gives 2 (accelerate, brake), down-and-up gives 3, down-up-down gives 4.
+    */
+    uint8_t minAlternatingPeaks = 3;
 
     /**
      * Minimum amplitude each peak must reach, per side. The total swing is therefore
@@ -224,6 +160,10 @@ namespace Qbead
     uint32_t lastShakeTimeMs = 0;       
     /** Time of the last sample before a potential shake was initiated. */        
     uint32_t lastNearZeroTimeMs = 0;
+    /** Sign of the most recent peak (+1 or -1); 0 if none yet. */
+    int8_t lastPeakSign = 0;
+    /** Number of sign changes in the current attempt, counting the first peak. */
+    uint8_t alternatingPeakCount = 0;
     /** @} */
 
     /**
@@ -285,6 +225,8 @@ namespace Qbead
         float filterGain = dtSeconds / ((hasPositivePeak || hasNegativePeak)
                                         ? 4 * intGravityEstTimeConstantSeconds // slow down mid-shake to preserve gravity estimate
                                         : intGravityEstTimeConstantSeconds);
+        // never extrapolate past the measurement after a long gap
+        filterGain = fminf(filterGain, 1.0f);   
         for (int i = 0; i < 3; i++)
           gravityEstimate[i] += filterGain * (accelSphere[i] - gravityEstimate[i]);
       }
@@ -302,14 +244,27 @@ namespace Qbead
         lastNearZeroTimeMs = nowMillis;
       }
       // logic for during an initiated shake attempt.
-      if (onAxisAbsAmp > minPeakAmplitude && offAxisAccelAmp < maxOffAxisRatio * onAxisAbsAmp) {
+      if (onAxisAbsAmp > minPeakAmplitude && offAxisAccelAmp < maxOffAxisRatio * onAxisAbsAmp) 
+      {
+        int8_t peakSign = (onAxisAccelAmp > 0) ? 1 : -1;
+        // Stroke ramping up towards first valid peak 
         if (awaitingFirstPeak) 
         {
           // safety check for staleness, if failed fall back on current live shakeAxis.
           // current maxHalfPeriodMs is generous and mostly targets repeated too slow attempts preceding a fast one.
           bool nearZeroIsRecent = nowMillis - lastNearZeroTimeMs <= maxHalfPeriodMs; 
           memcpy(shakeAxisAtStart, nearZeroIsRecent ? shakeAxisPrePrimaryPeak : shakeAxis, sizeof shakeAxis);
+          // init/reset peak counting
+          alternatingPeakCount = 0;
+          lastPeakSign = 0;
         }
+        if (peakSign != lastPeakSign) 
+        { 
+          // Don't double count the same (increasing) peak
+          alternatingPeakCount++; 
+          lastPeakSign = peakSign; 
+        }
+        // Post first peak we detect until desired peak count is reached
         if (onAxisAccelAmp > 0) {
           if (!hasPositivePeak || onAxisAccelAmp > positivePeakAmplitude) positivePeakAmplitude = onAxisAccelAmp;
           positivePeakTimeMs = nowMillis;
@@ -324,41 +279,19 @@ namespace Qbead
       // 7. Report a shake: Both peaks present, large enough swing, cooldown over.
       float peakToPeakAmplitude = positivePeakAmplitude - negativePeakAmplitude;
       if (hasPositivePeak && hasNegativePeak &&
+          alternatingPeakCount >= minAlternatingPeaks &&
           peakToPeakAmplitude > minPeakToPeakAmplitude &&
-          nowMillis - lastShakeTimeMs > cooldownMs) {
+          nowMillis - lastShakeTimeMs > cooldownMs) 
+      {
         hasPositivePeak = hasNegativePeak = false;
+        alternatingPeakCount = 0; 
+        lastPeakSign = 0;
         lastShakeTimeMs = nowMillis;
         return true;
       }
       return false;
     }
   };
-
-
-  /**
-   * @brief Tracks the gravity direction by fusing gyroscope and accelerometer.
-   *
-   * Each step rotates the estimate with the gyro (accurate during motion) and then
-   * pulls it slowly toward the accelerometer (corrects drift). The pull is weighted
-   * by how close |accel| is to 1 g, so shakes and impacts barely disturb it.
-   * All vectors are in the sphere frame; the axis mapping must be a proper rotation
-   * (determinant +1), as for your ix/iy/iz and sx/sy/sz.
-   */
-  //struct GravityTracker {
-  //  float g[3] = {0, 0, 1}; bool init = false;
-  //  void update(const float a[3], const float w_dps[3], float dt) {   // chip frame!
-  //    const float D2R = 0.0174533f, TAU = 1.5f;
-  //    if (!init) { memcpy(g, a, sizeof g); init = true; return; }
-  //    float w[3] = {w_dps[0]*D2R, w_dps[1]*D2R, w_dps[2]*D2R};
-  //    float c[3] = {w[1]*g[2]-w[2]*g[1], w[2]*g[0]-w[0]*g[2], w[0]*g[1]-w[1]*g[0]};
-  //    for (int i = 0; i < 3; i++) g[i] -= c[i]*dt;                    // predict
-  //    float am  = sqrtf(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
-  //    float k   = (dt/TAU) * fmaxf(0.f, 1.f - fabsf(am - 1.f)/0.3f);   // trust accel near 1 g
-  //    for (int i = 0; i < 3; i++) g[i] += k*(a[i] - g[i]);            // correct
-  //    float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
-  //    for (int i = 0; i < 3; i++) g[i] /= gm;
-  //  }
-  //};
 
   /**
    * @brief Tracks the gravity direction by fusing gyroscope and accelerometer readings.
@@ -521,21 +454,18 @@ namespace Qbead
     const uint8_t ix, iy, iz;
     const bool sx, sy, sz;
     float rbuffer[3];
-    float whentapped_buffer[3];
-    float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
+    float whentapped_buffer[3]= {0.f, 0.f, 1.f};;
+    float whenshaken_buffer[3]= {0.f, 0.f, 1.f};    /**< Unit shake axis (sphere frame) at the start of the last shake. */
+    float gyroBiasDps[3] = {0.f, 0.f, 0.f};         /**< Learned gyro zero-rate offset (deg/s), subtracted from every reading. */
+    float x_whentapped, y_whentapped, z_whentapped; /**< set when wasTapped is called */
+    float x_whenshaken, y_whenshaken, z_whenshaken; /**< set when wasShaken is called */
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
     float t_acc, p_acc;                             // theta and phi according to gravity
-    // TODO
-    float gyroBias[3] = {0,0,0}; // auto learns zero-rate level of gyro to subtract for accuracy
-    float whenshaken_buffer[3]; // gravity at the moment of the shake
-    float x_whenshaken, y_whenshaken, z_whenshaken;
-    //float T_imu;                                    // last update from the IMU TODO
-    uint32_t T_imu;
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
     bool shaken = false;
+    uint32_t T_imu; // last update from the IMU
 
-    // TODO (added volatile)
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
         color(255, 0, 0),   // Red
@@ -928,42 +858,65 @@ namespace Qbead
       T_imu = T_new;
       const float T = 100000; // 100 ms // TODO make the filter timeconstant configurable
 
-      // TODO
-      // Gravity tracking
-      // Gravity tracking + shake detection (exactly one shake.update per call)
-      float wc[3] = { imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ() };  // dps, chip frame
-      float am = sqrtf(rawmag2);
-      float wm2 = 0;
-      for (int i = 0; i < 3; i++) { float d = wc[i] - gyroBias[i]; wm2 += d*d; }
-      if (fabsf(am - 1.f) < 0.03f && wm2 < 9.f)                       // still: learn bias
-        for (int i = 0; i < 3; i++) gyroBias[i] += 0.002f * (wc[i] - gyroBias[i]);
-      float w[3] = { (1-2*sx)*(wc[ix]-gyroBias[ix]),
-                     (1-2*sy)*(wc[iy]-gyroBias[iy]),
-                     (1-2*sz)*(wc[iz]-gyroBias[iz]) };
-      float r[3] = {rx, ry, rz};
+      //// TODO
+      //// Gravity tracking + shake detection (exactly one shake.update per call)
+      //float wc[3] = { imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ() };  // dps, sphere frame
+      //float am = sqrtf(rawmag2);
+      //float wm2 = 0;
+      //for (int i = 0; i < 3; i++) 
+      //{ 
+      //  float d = wc[i] - gyroBiasDps[i];
+      //  wm2 += d*d;
+      // }
+      //if (fabsf(am - 1.f) < 0.03f && wm2 < 9.f)  // still: learn bias
+      //  for (int i = 0; i < 3; i++) gyroBiasDps[i] += 0.002f * (wc[i] - gyroBiasDps[i]);
+      //float w[3] = { (1-2*sx)*(wc[ix]-gyroBiasDps[ix]),
+      //               (1-2*sy)*(wc[iy]-gyroBiasDps[iy]),
+      //               (1-2*sz)*(wc[iz]-gyroBiasDps[iz]) };
+      //float r[3] = {rx, ry, rz};
+//
+      //gravity.update(r, w, dt);   // handles gaps and (re)seeding itself
+      //if (gravity.isInitialised && shake.update(r, dt, millis(), gravity.gravityEstimate))
+      //{
+      //  for (int i = 0; i < 3; i++) whenshaken_buffer[i] = shake.shakeAxisAtStart[i];
+      //  shaken = true;
+      //}
+      // Gravity tracking + Shake detection (exactly one shake.update per call)
 
-      if (delta > T)
+      // Gyro: read in the chip frame, learn the zero-rate offset while still, then map to the sphere frame.
+      const float stillAccelTolerance = 0.03f;       // |accel| within this many g of 1 g counts as still
+      const float stillGyroMaxSquaredDps2 = 9.f;     // (3 deg/s)^2: rotation below this counts as still
+      const float biasLearningGain = 0.002f;         // fraction of the error absorbed per call
+
+      float gyroChipDps[3] = { imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ() };  // deg/s, chip frame
+      float accelMagnitude = sqrtf(rawmag2);          // unit of g
+      float gyroResidualSquaredDps2 = 0;              // squared rate left after bias removal
+      for (int i = 0; i < 3; i++)
       {
-        gravity.init = false;     // restart both estimators after a gap
-        shake.init = false;
+        float gyroResidualDps = gyroChipDps[i] - gyroBiasDps[i];
+        gyroResidualSquaredDps2 += gyroResidualDps * gyroResidualDps;
       }
-      else
+      bool isStill = fabsf(accelMagnitude - 1.f) < stillAccelTolerance &&
+                     gyroResidualSquaredDps2 < stillGyroMaxSquaredDps2;
+      if (isStill)                                    // learn the zero-rate offset
+        for (int i = 0; i < 3; i++)
+          gyroBiasDps[i] += biasLearningGain * (gyroChipDps[i] - gyroBiasDps[i]);
+
+      float gyroSphereDps[3] = { (1 - 2*sx) * (gyroChipDps[ix] - gyroBiasDps[ix]),
+                                 (1 - 2*sy) * (gyroChipDps[iy] - gyroBiasDps[iy]),
+                                 (1 - 2*sz) * (gyroChipDps[iz] - gyroBiasDps[iz]) };
+      float accelSphere[3] = { rx, ry, rz };           // g, sphere frame, unsmoothed
+
+      gravity.update(accelSphere, gyroSphereDps, dt);  // handles gaps and (re)seeding itself
+      if (gravity.isInitialised &&
+          shake.update(accelSphere, dt, millis(), gravity.gravityEstimate))
       {
-        gravity.update(r, w, dt);
-        if (shake.update(r, dt, millis(), gravity.g))
-        {
-          //whenshaken_buffer[0] = gravity.g[0];   // or shake.trigAx_atShakeStart[...] if you added the start-of-shake snapshot
-          //whenshaken_buffer[1] = gravity.g[1];
-          //whenshaken_buffer[2] = gravity.g[2];
-          whenshaken_buffer[0] = shake.trigAx_atShakeStart[0];
-          whenshaken_buffer[1] = shake.trigAx_atShakeStart[1];
-          whenshaken_buffer[2] = shake.trigAx_atShakeStart[2];
-          shaken = true;
-        }
+        for (int i = 0; i < 3; i++) whenshaken_buffer[i] = shake.shakeAxisAtStart[i];
+        shaken = true;
       }
       // TODO
 
-
+      // Only activate smoothing filter if read gap is small enough
       if (delta > T)
       {
         x = rx;
@@ -995,14 +948,24 @@ namespace Qbead
       if (!tappedrecorded && tapped)
       {
         tappedrecorded = true;
-        // TODO: Why re-read this info without it being ex-LPF'ed???
-        //whentapped_buffer[0] = imu.readFloatAccelX();
-        //whentapped_buffer[1] = imu.readFloatAccelY();
-        //whentapped_buffer[2] = imu.readFloatAccelZ();
-
-        whentapped_buffer[0] = x;
-        whentapped_buffer[1] = y;
-        whentapped_buffer[2] = z;
+        if (gravity.isInitialised)
+        {
+          // Best estimate: unit length, no lag during rotation, tap impulse ignored by the trust gate.
+          for (int i = 0; i < 3; i++) whentapped_buffer[i] = gravity.gravityEstimate[i];
+        }
+        else
+        {
+          // Tracker not valid yet (boot, long gap, or continuous motion): fall back to the
+          // smoothed accelerometer vector, normalised to unit length like the tracker's output.
+          float smoothedNorm = sqrtf(x*x + y*y + z*z);
+          if (smoothedNorm > 1e-6f)
+          {
+            whentapped_buffer[0] = x / smoothedNorm;
+            whentapped_buffer[1] = y / smoothedNorm;
+            whentapped_buffer[2] = z / smoothedNorm;
+          }
+          // else: keep the previous buffer content rather than storing an invalid vector
+        }
       }
 
       if (print)
