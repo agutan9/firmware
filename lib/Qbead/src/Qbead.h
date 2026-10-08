@@ -37,7 +37,6 @@ namespace Qbead
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
           sx(sx), sy(sy), sz(sz),
-          // TODO: REFACTOR
           shake(),
           gravity()
     {
