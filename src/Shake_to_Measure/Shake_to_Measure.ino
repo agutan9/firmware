@@ -69,7 +69,6 @@ void loop() {
   uint32_t color = addColor(scaleColor(1 - delta, event_color), scaleColor(delta, white));
   bead.setBloch_deg(current_state, color);
 
-=======
 // ## Event loop
 //
 // The loop function is called repeatedly until the Qbead is powered off.
@@ -152,9 +151,6 @@ void loop() {
 //  // Show the result.
 //  bead.show();
 //}
-=======
-
->>>>>>> 55400e8 (Cleaned up commented out code in ShakeToMeasure)
 void loop() {
   static long last_event = 0;
   static uint32_t event_color = white;
@@ -193,11 +189,84 @@ void loop() {
   float delta = max(min(millis() - last_event, 2000), 0) / 2000.0;
   uint32_t color = addColor(scaleColor(1 - delta, event_color), scaleColor(delta, white));
   bead.setBloch_deg(current_state, color);
+  bead.show();
+}
+float delta = 0.0;
+float beta = 0.0;
+bool clean = false;
+bool clean_block = false;
 
-<<<<<<< HEAD
+
+void loop() {
+  static long last_tap = 0;
+  static uint32_t tap_color = white;
+
+  static long last_write = 0;
+
+  // Clear the display.
+  bead.clear();
+  // Read the IMU to get the current gravity direction.
+  if (delta < 0.5)
+  {
+    clean = true;
+    if (millis() - last_write > 100){
+        bead.readIMU(true);
+        last_write = millis();
+    }
+    else {
+        bead.readIMU(false);
+    }
+  }
+  else {
+    clean = false;
+    clean_block = false;
+    bead.readIMU(false);
+  }
+
+  if (clean && !clean_block){
+    for (size_t i = 0; i < 5; i++)
+    {
+        Serial.println();
+    }    
+    Serial.println("trec |  tap   |   X   |   Y   |   Z   |  mag2 | rmag2 | ?     | ?    |  t_acc | p_acc  | ?   |   ?");
+    clean_block = true;
+
+    last_write = millis();
+  }
+
+  if (bead.wasTapped()){
+    last_tap = millis();
+    BlochVector acc_vector(bead.x_whentapped, bead.y_whentapped, bead.z_whentapped);
+
+    float probability = pow(innerProductAbs(current_state, acc_vector),2);
+    float threshold = random(0, 100)/100.0f;
+    float identity_threshold = 0.9;
+    //Serial.print("probability: ");
+    //Serial.println(probability);
+    //Serial.print("threshold: ");
+    //Serial.println(threshold);
+    if (probability > identity_threshold) {
+      tap_color = red;
+      //Serial.println("red identity");
+    } else if (probability < 1 - identity_threshold) {
+      tap_color = blue;
+      //Serial.println("blue identity");
+    } else if (probability > threshold) {
+      current_state = acc_vector;
+      tap_color = red;
+      //Serial.println("red random");
+    } else {
+      current_state = -acc_vector;
+      tap_color = blue;
+      //Serial.println("blue random");
+    }
+  }
+
+  delta = max(min(millis() - last_tap, 2000), 0) / 2000.0;
+  //float delta = max(min(millis() - last_tap, 2000), 0) / 2000.0;
+  uint32_t color = addColor(scaleColor(1-delta, tap_color), scaleColor(delta, white));
+  bead.setBloch_deg(current_state, color);
+
   // Show the result.
->>>>>>> d2ee3e1 (Added DEBUG inos. Added draft Shake logic to Qbead.h. Also fixed readIMU time_tracking (was floats now uint32_t))
-=======
->>>>>>> e6fcefc (Addition of gravity tracker to Qbead.h)
   bead.show();
 }

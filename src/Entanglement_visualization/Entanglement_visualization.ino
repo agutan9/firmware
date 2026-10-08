@@ -420,8 +420,4 @@ void loop()
 
     // Animated modes are advanced here, once per main-loop pass
     updateVisual();
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 3e632a6 (Implment new version of sketch code that use the updated firmware (inner state visualization support and non-blocking cycling))
