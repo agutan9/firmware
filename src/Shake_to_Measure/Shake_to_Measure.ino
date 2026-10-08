@@ -27,7 +27,9 @@ void setup() {
   bead.testPixels();
 }
 
-
+// TODO: Maybe rewrite this to be more in line with how Barna add Serials etc to his
+// sketches? I of course copied this from TapToMeasure.
+// Combine the two? Have one gesture be the default one?
 void loop() {
   static long last_event = 0;
   static uint32_t event_color = white;

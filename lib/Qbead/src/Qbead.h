@@ -495,6 +495,9 @@ namespace Qbead
       float dt = delta * 1e-6f;
       T_imu = T_new;
 
+      // TODO: Should these be public class members? Possibly
+      // TODO: FUTURE:
+      //    Refactor such that gyroscope can (shake and gravity) can be turned off
       // Process Gyro: read in the chip frame, learn the zero-rate offset while still, then map to the sphere frame.
       const float stillAccelTolerance = 0.03f;   // |accel| within this many g of 1 g counts as still
       const float stillGyroMaxSquaredDps2 = 9.f; // (3 deg/s)^2: rotation below this counts as still
