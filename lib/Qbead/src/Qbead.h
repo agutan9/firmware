@@ -77,10 +77,15 @@ namespace Qbead
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
     float t_acc, p_acc;                             // theta and phi according to gravity
     // TODO
+    float gyroBias[3] = {0,0,0}; // auto learns zero-rate level of gyro to subtract for accuracy
+    float whenshaken_buffer[3]; // gravity at the moment of the shake
+    float x_whenshaken, y_whenshaken, z_whenshaken;
     //float T_imu;                                    // last update from the IMU TODO
     uint32_t T_imu;
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
+    bool shaken = false;
+
     // TODO (added volatile)
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
@@ -411,6 +416,14 @@ namespace Qbead
       }
 
       return false;
+    bool wasShaken()
+    {
+      if (!shaken) return false;
+      shaken = false;
+      x_whenshaken = whenshaken_buffer[0];
+      y_whenshaken = whenshaken_buffer[1];
+      z_whenshaken = whenshaken_buffer[2];
+      return true;
     }
 
     BLEManager::DataPacket takeLatestPacket()
