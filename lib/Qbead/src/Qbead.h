@@ -428,6 +428,7 @@ namespace Qbead
       callbackTarget->tapped = true;
     }
 
+
     void readIMU(bool print = true)
     {
       rbuffer[0] = imu.readFloatAccelX();
