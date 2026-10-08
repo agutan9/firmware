@@ -563,8 +563,6 @@ namespace Qbead
       if (shake.update(r, delta*1e-6f, T_new)){
         Serial.println("SHAKEN");
       }
-      Serial.print("Swings: ");
-      Serial.println(shake.getSwings());
       // TODO
 
       if (!tappedrecorded && tapped)
