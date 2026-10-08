@@ -1,7 +1,10 @@
-// # Tap to Measure
-//
+# 1 "C:\\Users\\TimBr\\AppData\\Local\\Temp\\tmppn4xdf1e"
+#include <Arduino.h>
+# 1 "C:/Users/TimBr/Study/QIST/SecondYear/Q5PROJECT/Qbead/MDP_repo/src/Shake_to_measure/Shake_to_Measure.ino"
 
-// First, let's include the Qbead library and set up a few useful data structures.
+
+
+
 #include <internal/BlochVector.h>
 #include <internal/QbeadUtils.h>
 #include <Qbead.h>
@@ -12,30 +15,29 @@ Qbead::Qbead bead;
 
 BlochVector current_state(90, 0);
 
-// Prepare some colors for the visualization during the game.
+
 uint32_t white = color(255, 255, 255);
 uint32_t red = color(255, 0, 0);
 uint32_t blue = color(0, 0, 255);
-
-// ## Setup
-//
-// The setup function is called once when the Qbead is powered on and it is used to initialize the Qbead and set up the game.
+void setup();
+void loop();
+#line 23 "C:/Users/TimBr/Study/QIST/SecondYear/Q5PROJECT/Qbead/MDP_repo/src/Shake_to_measure/Shake_to_Measure.ino"
 void setup() {
   bead.begin();
   bead.setBrightness(25);
-  // Test the pixels by flashing a colorful pattern to make sure they are working.
+
   bead.testPixels();
 }
 
-// TODO: Maybe rewrite this to be more in line with how Barna add Serials etc to his
-// sketches? I of course copied this from TapToMeasure.
-// Combine the two? Have one gesture be the default one?
+
+
+
 void loop() {
   static long last_event = 0;
   static uint32_t event_color = white;
 
   bead.clear();
-  bead.readIMU(false);          // must run every loop: it feeds the gravity tracker and shake detector
+  bead.readIMU(false);
 
   if (bead.wasShaken()) {
     last_event = millis();
@@ -69,6 +71,6 @@ void loop() {
   uint32_t color = addColor(scaleColor(1 - delta, event_color), scaleColor(delta, white));
   bead.setBloch_deg(current_state, color);
 
-  // Show the result.
+
   bead.show();
 }
