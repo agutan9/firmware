@@ -350,6 +350,7 @@ void loop()
     {
         Serial.print("Received visual: ");
         Serial.println(packet.value);
+        c_tap = 0;
         activateVisual(packet.value);
     }
     else if (packet.type == BLEManager::CommandType::ClearStates)
