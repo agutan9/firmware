@@ -69,6 +69,23 @@ namespace Qbead
     float x = 0.f, y = 0.f, z = 0.f;
     float rx = 0.f, ry = 0.f, rz = 0.f;
     uint32_t T_imu = 0;
+    float whentapped_buffer[3];
+    float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
+    float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
+    float t_acc, p_acc;                             // theta and phi according to gravity
+    float T_imu;                                    // last update from the IMU
+    bool tapped = false;
+    bool tappedrecorded = false;
+    uint32_t stateColours[INNER_STATE_COUNT] = {
+        color(0, 0, 255),   // Blue
+        color(255, 0, 0),   // Red
+        color(0, 255, 0),   // Green
+        color(255, 255, 0), // Yellow
+        color(255, 0, 255), // Magenta
+        color(255, 128, 0)  // Orange
+    };
+    uint32_t cyclingIndex = 0;
+    uint32_t lastChange = 0;
 
 
     bool localEntangleRequestPending = false;
@@ -649,18 +666,7 @@ namespace Qbead
     {
       if (innerStateCount == 0)
       {
-        const BlochVector &item = innerStates[i];
-
-        float thetaDifference = fabsf(item.theta - state.theta);
-
-        float phiDifference = fabsf(item.phi - state.phi);
-        phiDifference = min(phiDifference, 360.0f - phiDifference);
-
-        if (thetaDifference <= thetaTolerance &&
-            phiDifference <= phiTolerance)
-        {
-          return true;
-        }
+        return;
       }
       uint32_t currentTime = millis();
       uint32_t deltaTime = currentTime - lastChange;
