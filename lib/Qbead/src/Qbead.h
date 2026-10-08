@@ -36,9 +36,7 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz),
-          shake(),
-          gravity()
+          sx(sx), sy(sy), sz(sz)
     {
     }
 
@@ -155,14 +153,6 @@ namespace Qbead
 
       // Single-tap interrupt driven to pin 1
       imu.writeRegister(LSM6DS3_ACC_GYRO_MD1_CFG, LSM6DS3_ACC_GYRO_INT1_SINGLE_TAP_ENABLED);
-
-      // TODO
-      // Enable low pass filter and set cutoff frequency to datarate/400
-      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, LSM6DS3_ACC_GYRO_LPF2_XL_EN | LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_100);
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x60);
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x80);
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x00);
-      // TODO
 
       // Setup interrupt callback
       pinMode(PIN_LSM6DS3TR_C_INT1, INPUT);
@@ -500,18 +490,17 @@ namespace Qbead
       uint32_t delta = T_new - T_imu;
       float dt = delta * 1e-6f;
       T_imu = T_new;
+      const float T = 100000; // 100 ms // TODO make the filter timeconstant configurable
+      // PR: This is an old TODO olready present. Will refactor it before final PR merge
 
-      // TODO: Should these be public class members? Possibly
-      // TODO: FUTURE:
-      //    Refactor such that gyroscope can (shake and gravity) can be turned off
       // Process Gyro: read in the chip frame, learn the zero-rate offset while still, then map to the sphere frame.
-      const float stillAccelTolerance = 0.03f;   // |accel| within this many g of 1 g counts as still
-      const float stillGyroMaxSquaredDps2 = 9.f; // (3 deg/s)^2: rotation below this counts as still
-      const float biasLearningGain = 0.002f;     // fraction of the error absorbed per call
+      const float stillAccelTolerance = 0.03f;       // |accel| within this many g of 1 g counts as still
+      const float stillGyroMaxSquaredDps2 = 9.f;     // (3 deg/s)^2: rotation below this counts as still
+      const float biasLearningGain = 0.002f;         // fraction of the error absorbed per call
 
-      float gyroChipDps[3] = {imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ()}; // deg/s, chip frame
-      float accelMagnitude = sqrtf(rawmag2);                                                     // unit of g
-      float gyroResidualSquaredDps2 = 0;                                                         // squared rate left after bias removal
+      float gyroChipDps[3] = { imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ() };  // deg/s, chip frame
+      float accelMagnitude = sqrtf(rawmag2);          // unit of g
+      float gyroResidualSquaredDps2 = 0;              // squared rate left after bias removal
       for (int i = 0; i < 3; i++)
       {
         float gyroResidualDps = gyroChipDps[i] - gyroBiasDps[i];
