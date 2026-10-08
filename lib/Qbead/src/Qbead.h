@@ -15,32 +15,48 @@ namespace Qbead
 {
     // TODO: REMOVE AND REFACTOR
   struct ShakeDetector {
+    float g[3]; 
+    float startG[3];
+    float vPos = 0, vNeg = 0; // members: largest peak on each side
+    bool init = false;
     uint32_t tPos = 0, tNeg = 0, tFire = 0;
     bool havePos = false, haveNeg = false;
-    bool active() const { return havePos || haveNeg; }
-    
-    bool update(const float r[3], const float g[3], uint32_t nowMs) {
-      const float THR = 0.8f, PERP_RATIO = 0.6f;
+
+    bool update(const float r[3], float dt, uint32_t nowMs, const float* gExt = nullptr) {
+      const float TAU = 1.0f, THR = 0.5f, P2P = 1.9f, PERP_RATIO = 0.45f;
       const uint32_t WINDOW_MS = 300, COOLDOWN_MS = 500;
+      if (gExt) { memcpy(g, gExt, sizeof g); init = true; }
+      else if (!init) { memcpy(g, r, sizeof g); init = true; }
+
       float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
       float h[3]   = {g[0]/gm, g[1]/gm, g[2]/gm};
       float lin[3] = {r[0]-g[0], r[1]-g[1], r[2]-g[2]};
       float par  = lin[0]*h[0] + lin[1]*h[1] + lin[2]*h[2];
       float pe[3] = {lin[0]-par*h[0], lin[1]-par*h[1], lin[2]-par*h[2]};
       float perp = sqrtf(pe[0]*pe[0] + pe[1]*pe[1] + pe[2]*pe[2]);
-    
-      if (fabsf(par) > THR && perp < PERP_RATIO * fabsf(par)) {
-        if (par > 0) { tPos = nowMs; havePos = true; }
-        else         { tNeg = nowMs; haveNeg = true; }
-      }
+
+      if (!gExt) {
+        float a = dt / ((havePos || haveNeg) ? 4*TAU : TAU); // slow down mid-shake
+        for (int i = 0; i < 3; i++) g[i] += a * (r[i] - g[i]);
+      }      
+      // Expiry windows
       if (havePos && nowMs - tPos > WINDOW_MS) havePos = false;
       if (haveNeg && nowMs - tNeg > WINDOW_MS) haveNeg = false;
-      if (havePos && haveNeg && nowMs - tFire > COOLDOWN_MS) {
+      
+      bool idle = !(havePos || haveNeg);
+      if (fabsf(par) > THR && perp < PERP_RATIO * fabsf(par)) {
+        if (idle) memcpy(startG, g, sizeof g); // gravity at the first excursion
+        if (par > 0) { if (!havePos || par > vPos) vPos = par; tPos = nowMs; havePos = true; }
+        else         { if (!haveNeg || par < vNeg) vNeg = par; tNeg = nowMs; haveNeg = true; }
+      }
+
+      if (havePos && haveNeg && (vPos - vNeg) > P2P && nowMs - tFire > COOLDOWN_MS) {
         havePos = haveNeg = false; tFire = nowMs; return true;
       }
       return false;
     }
   };
+  // TODO: Leave these as structs? Or integrate fully as disparate methods and variables/constants
   struct GravityTracker {
     float g[3] = {0, 0, 1}; bool init = false;
     void update(const float a[3], const float w_dps[3], float dt) {   // chip frame!
@@ -108,10 +124,15 @@ namespace Qbead
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
     float t_acc, p_acc;                             // theta and phi according to gravity
     // TODO
+    float gyroBias[3] = {0,0,0}; // auto learns zero-rate level of gyro to subtract for accuracy
+    float whenshaken_buffer[3]; // gravity at the moment of the shake
+    float x_whenshaken, y_whenshaken, z_whenshaken;
     //float T_imu;                                    // last update from the IMU TODO
     uint32_t T_imu;
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
+    bool shaken = false;
+
     // TODO (added volatile)
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
@@ -159,8 +180,11 @@ namespace Qbead
       imu.writeRegister(LSM6DS3_ACC_GYRO_INT_DUR2, LSM6DS3_ACC_GYRO_SHOCK_MASK & 0b11);
 
       // Set tap threshold:
-      uint8_t thrshold_setting = 8; // number between 0 and 31
-      imu.writeRegister(LSM6DS3_ACC_GYRO_TAP_THS_6D, thrshold_setting);
+      // TODO
+      //uint8_t thrshold_setting = 8; // number between 0 and 31
+      uint8_t threshold_setting = 2;
+      // TODO
+      imu.writeRegister(LSM6DS3_ACC_GYRO_TAP_THS_6D, threshold_setting);
 
       // Only do single tap detection. Seems like the naming is incorrect?
       // TODO: INDEED INCORRECT, Library wrapper implemented reverse from spec sheet
@@ -169,8 +193,13 @@ namespace Qbead
       // Single-tap interrupt driven to pin 1
       imu.writeRegister(LSM6DS3_ACC_GYRO_MD1_CFG, LSM6DS3_ACC_GYRO_INT1_SINGLE_TAP_ENABLED);
 
+      // TODO
       // Enable low pass filter and set cutoff frequency to datarate/400
-      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, LSM6DS3_ACC_GYRO_LPF2_XL_EN | LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_400);
+      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, LSM6DS3_ACC_GYRO_LPF2_XL_EN | LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_100);
+      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x60);
+      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x80);
+      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x00);
+      // TODO
 
       // Setup interrupt callback
       pinMode(PIN_LSM6DS3TR_C_INT1, INPUT);
@@ -371,9 +400,14 @@ namespace Qbead
       // save tapped location
       if (wasTapped)
       {
-        x_whentapped = whentapped_buffer[ix];
-        y_whentapped = whentapped_buffer[iy];
-        z_whentapped = whentapped_buffer[iz];
+        // TODO: ALready in Sphere coordinates
+        //x_whentapped = whentapped_buffer[ix];
+        //y_whentapped = whentapped_buffer[iy];
+        //z_whentapped = whentapped_buffer[iz];
+        x_whentapped = whentapped_buffer[0];
+        y_whentapped = whentapped_buffer[1];
+        z_whentapped = whentapped_buffer[2];
+        // TODO
       }
       return wasTapped;
     }
@@ -441,6 +475,16 @@ namespace Qbead
       }
       return packet;
     }
+    
+    bool wasShaken()
+    {
+      if (!shaken) return false;
+      shaken = false;
+      x_whenshaken = whenshaken_buffer[0];
+      y_whenshaken = whenshaken_buffer[1];
+      z_whenshaken = whenshaken_buffer[2];
+      return true;
+    }
 
     BLEManager::DataPacket takeLatestPacket()
     {
@@ -474,13 +518,50 @@ namespace Qbead
       rx = (1 - 2 * sx) * rbuffer[ix];
       ry = (1 - 2 * sy) * rbuffer[iy];
       rz = (1 - 2 * sz) * rbuffer[iz];
-
       float rawmag2 = rx * rx + ry * ry + rz * rz;
 
       uint32_t T_new = micros(); //TODO: Can lose resolution after ~3-4h
       uint32_t delta = T_new - T_imu;
+      float dt = delta*1e-6f;
       T_imu = T_new;
       const float T = 100000; // 100 ms // TODO make the filter timeconstant configurable
+
+      // TODO
+      // Gravity tracking
+      // Gravity tracking + shake detection (exactly one shake.update per call)
+      float wc[3] = { imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ() };  // dps, chip frame
+      float am = sqrtf(rawmag2);
+      float wm2 = 0;
+      for (int i = 0; i < 3; i++) { float d = wc[i] - gyroBias[i]; wm2 += d*d; }
+      if (fabsf(am - 1.f) < 0.03f && wm2 < 9.f)                       // still: learn bias
+        for (int i = 0; i < 3; i++) gyroBias[i] += 0.002f * (wc[i] - gyroBias[i]);
+      float w[3] = { (1-2*sx)*(wc[ix]-gyroBias[ix]),
+                     (1-2*sy)*(wc[iy]-gyroBias[iy]),
+                     (1-2*sz)*(wc[iz]-gyroBias[iz]) };
+      float r[3] = {rx, ry, rz};
+
+      if (delta > T)
+      {
+        gravity.init = false;     // restart both estimators after a gap
+        shake.init = false;
+      }
+      else
+      {
+        gravity.update(r, w, dt);
+        if (shake.update(r, dt, millis(), gravity.g))
+        {
+          //whenshaken_buffer[0] = gravity.g[0];   // or shake.startG[...] if you added the start-of-shake snapshot
+          //whenshaken_buffer[1] = gravity.g[1];
+          //whenshaken_buffer[2] = gravity.g[2];
+          whenshaken_buffer[0] = shake.startG[0];
+          whenshaken_buffer[1] = shake.startG[1];
+          whenshaken_buffer[2] = shake.startG[2];
+          shaken = true;
+        }
+      }
+      // TODO
+
+
       if (delta > T)
       {
         x = rx;
@@ -502,22 +583,12 @@ namespace Qbead
       // t_acc = theta(x, y, z) * 180 / 3.14159;
       // p_acc = phi(x, y) * 180 / 3.14159;
       t_acc = theta(x, y, z) * RAD_TO_DEG;
-      p_acc = phi(x, y, z) * RAD_TO_DEG;
+      p_acc = phi(x, y) * RAD_TO_DEG;
       // TODO
       if (p_acc < 0)
       {
         p_acc += 360;
       } // to bring it to [0,360] range
-
-      // TODO
-      float r[3];
-      r[0] = rx;
-      r[1] = rx;
-      r[2] = rx;
-      if (shake.update(r, delta*1e-6f, T_new)){
-        Serial.println("SHAKEN");
-      }
-      // TODO
 
       if (!tappedrecorded && tapped)
       {
