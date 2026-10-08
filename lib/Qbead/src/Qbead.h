@@ -36,9 +36,7 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz),
-          shake(),
-          gravity()
+          sx(sx), sy(sy), sz(sz)
     {
     }
 
@@ -74,7 +72,7 @@ namespace Qbead
     float whentapped_buffer[3];
     float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
-    float t_acc, p_acc;                             // theta and phi according to gravity
+    float t_acc, p_acc;             // TODO: why put these here? is this comment even correct?? ->     // theta and phi according to gravity
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
     bool shaken = false;
@@ -471,7 +469,6 @@ namespace Qbead
       callbackTarget->tappedrecorded = false;
       callbackTarget->tapped = true;
     }
-
 
 
     void readIMU(bool print = true)
