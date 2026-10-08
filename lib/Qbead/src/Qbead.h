@@ -18,8 +18,7 @@ namespace Qbead
   class Qbead
   {
   public:
-    Qbead(BLEManager::Role role = BLEManager::Role::Dual,
-          const uint16_t pin00 = QB_LEDPIN,
+    Qbead(const uint16_t pin00 = QB_LEDPIN,
           const uint16_t pixelconfig = QB_PIXELCONFIG,
           const uint16_t nsections = QB_NSECTIONS,
           const uint16_t nlegs = QB_NLEGS,
@@ -650,7 +649,18 @@ namespace Qbead
     {
       if (innerStateCount == 0)
       {
-        return;
+        const BlochVector &item = innerStates[i];
+
+        float thetaDifference = fabsf(item.theta - state.theta);
+
+        float phiDifference = fabsf(item.phi - state.phi);
+        phiDifference = min(phiDifference, 360.0f - phiDifference);
+
+        if (thetaDifference <= thetaTolerance &&
+            phiDifference <= phiTolerance)
+        {
+          return true;
+        }
       }
       uint32_t currentTime = millis();
       uint32_t deltaTime = currentTime - lastChange;

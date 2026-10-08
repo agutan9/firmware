@@ -3,10 +3,15 @@
 
 using namespace Qbead;
 
-Qbead::Qbead bead(BLEManager::Role::Dual);
+Qbead::Qbead bead;
+BlochVector up(0, 0);
+BlochVector down(180, 0);
+int c_tap = 0;
 
 uint32_t blue = color(0, 0, 255);
 uint32_t red = color(255, 0, 0);
+uint32_t white = color(255, 255, 255);
+
 int tap_count = 0;
 
 void flash(uint32_t flashColor, uint16_t durationMs = 120)
@@ -30,50 +35,49 @@ void setup()
     bead.begin();
     bead.setBrightness(25);
     bead.testPixels();
-}
-
-void asd()
-{
-    BLEManager::DataPacket packet = bead.takeLatestPacket();
-    if (packet.type == static_cast<uint8_t>(Qbead::CommandType::SetOrchestrator))
-    {
-        Serial.println("Setting other party to be orchastrator");
-        flash(red);
-
-        bead.setOrchestrate(packet.value);
-    }
-    if (bead.wasTapped())
-    {
-        tap_count++;
-        if (tap_count < 10)
-        {
-            Serial.println("tapped");
-            return;
-        }
-        Serial.println("Setting myself to be orchastrator");
-        flash(blue);
-
-        bead.orchastrate();
-    }
+    bead.clear();
 }
 
 void loop()
 {
     bead.readIMU(false);
-
-    if (bead.isOrchastratorSet == 0)
+    BLEManager::DataPacket packet = bead.takeLatestPacket();
+    if (packet.type == BLEManager::CommandType::AddState)
     {
-        Serial.println("Scanning for taps...");
-        asd();
+        BlochVector newState(packet.theta, packet.phi);
+        bead.setBloch_deg(newState, packet.value);
     }
-
-    if (bead.isOrchastratorSet == 1)
+    else if (packet.type == BLEManager::CommandType::ClearStates)
     {
-        flash(blue);
+        c_tap = 0;
+        bead.innerStateCount = 0;
+        bead.clear();
     }
-    else if (bead.isOrchastratorSet == 2)
+    else if (bead.wasTapped())
     {
-        flash(red);
+        c_tap++;
+        Serial.println(c_tap);
+        if (c_tap >= 5 && !bead.hasState(up))
+        {
+            Serial.println("Setting spin up");
+            bead.addState(up);
+            bead.setBloch_deg(up, blue);
+            bead.ble.sendData(BLEManager::CommandType::AddState, blue, up.theta, up.phi);
+        }
+        else if (c_tap >= 10 && !bead.hasState(down))
+        {
+            Serial.println("Setting spin down");
+            bead.addState(down);
+            bead.setBloch_deg(down, red);
+            bead.ble.sendData(BLEManager::CommandType::AddState, red, down.theta, down.phi);
+        }
+        else if (c_tap > 20)
+        {
+            c_tap = 0;
+            bead.innerStateCount = 0;
+            bead.ble.sendData(BLEManager::CommandType::ClearStates, 0, 0, 0);
+            bead.clear();
+        }
     }
-    delay(500);
+    bead.show();
 }
