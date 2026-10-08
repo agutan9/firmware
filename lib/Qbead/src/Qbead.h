@@ -194,6 +194,11 @@ namespace Qbead
       // postConfigIMU_ShakeDetection: Shake is software based. 
       // Only relevant registers are the LPF's due to high-freq acc attenuation
 
+      // TODO
+      uint8_t id; imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
+      Serial.println(id, HEX);
+      // TODO
+
       ble.beginDualRole();
     }
 
