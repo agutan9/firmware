@@ -84,7 +84,6 @@ namespace BLEManager
 
     BLEClientService qBeadClientService;
     BLEService bleservice;
-
     BLEClientCharacteristic qBeadDataClient;
     BLECharacteristic qBeadDataChar;
 
