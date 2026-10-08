@@ -75,17 +75,11 @@ namespace Qbead
     float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
     float t_acc, p_acc;                             // theta and phi according to gravity
-    // TODO
-    float gyroBias[3] = {0,0,0}; // auto learns zero-rate level of gyro to subtract for accuracy
-    float whenshaken_buffer[3]; // gravity at the moment of the shake
-    float x_whenshaken, y_whenshaken, z_whenshaken;
-    //float T_imu;                                    // last update from the IMU TODO
-    uint32_t T_imu;
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
     bool shaken = false;
+    uint32_t T_imu; // last update from the IMU
 
-    // TODO (added volatile)
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
         color(255, 0, 0),   // Red
