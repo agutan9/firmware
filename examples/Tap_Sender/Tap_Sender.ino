@@ -1,11 +1,9 @@
-// Tap Sender: flash locally and notify the other Qbead.
-
 #include <Qbead.h>
 #include <QbeadUtils.h>
 
 using namespace Qbead;
 
-Qbead::Qbead bead(BLEManager::Role::Peripheral);
+Qbead::Qbead bead(BLEManager::Role::Dual);
 
 uint32_t blue = color(0, 0, 255);
 
