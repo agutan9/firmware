@@ -570,7 +570,7 @@ namespace Qbead
     float gyroBiasDps[3] = {0.f, 0.f, 0.f};         /**< Learned gyro zero-rate offset (deg/s), subtracted from every reading. */
     float x_whentapped, y_whentapped, z_whentapped; /**< set when wasTapped is called */
     float x_whenshaken, y_whenshaken, z_whenshaken; /**< set when wasShaken is called */
-    float t_acc = 0.f, p_acc = 0.f;
+    float theta_accvec = 0.f, phi_accvec = 0.f;
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
     bool shaken = false;
@@ -1006,15 +1006,15 @@ namespace Qbead
       hasAccelSample = true;
       float mag2 = x * x + y * y + z * z;
 
-      // Calculate angles from the smoothed sphere-frame acceleration,
+      // Calculate (display) angles from the smoothed sphere-frame acceleration,
       // not from gravity.gravityEstimate.
-      t_acc = theta(x, y, z) * RAD_TO_DEG;
-      p_acc = phi(x, y) * RAD_TO_DEG;
+      theta_accvec = theta(x, y, z) * RAD_TO_DEG;
+      phi_accvec = phi(x, y) * RAD_TO_DEG;
 
       // Wrap azimuth into [0, 360).
-      if (p_acc < 0)
+      if (phi_accvec < 0)
       {
-        p_acc += 360;
+        phi_accvec += 360;
       }
       
       if (!tappedrecorded && tapped)
@@ -1057,9 +1057,9 @@ namespace Qbead
         Serial.print("\t");
         Serial.print(rawmag2);
         Serial.print("\t-1\t1\t");
-        Serial.print(t_acc);
+        Serial.print(theta_accvec);
         Serial.print("\t");
-        Serial.print(p_acc);
+        Serial.print(phi_accvec);
         Serial.print("\t0\t360\t");
         Serial.println();
       }
