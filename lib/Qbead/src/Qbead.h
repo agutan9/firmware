@@ -36,7 +36,9 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz)
+          sx(sx), sy(sy), sz(sz),
+          // TODO: REFACTOR
+          shake()
     {
     }
 
@@ -73,7 +75,8 @@ namespace Qbead
     float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
     float t_acc, p_acc;                             // theta and phi according to gravity
-    float T_imu;                                    // last update from the IMU
+    //float T_imu;                                    // last update from the IMU TODO
+    uint32_t T_imu;
     bool tapped = false;
     bool tappedrecorded = false;
     uint32_t stateColours[INNER_STATE_COUNT] = {
@@ -454,6 +457,8 @@ namespace Qbead
       callbackTarget->tappedrecorded = false;
       callbackTarget->tapped = true;
     }
+
+
 
     void readIMU(bool print = true)
     {
