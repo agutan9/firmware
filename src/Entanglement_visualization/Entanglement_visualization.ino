@@ -66,7 +66,6 @@ uint32_t pauliColorMap(float geomInProd)
     uint8_t idx;
 
     if (mag < 0.05f)
-<<<<<<< HEAD
     { // ~0.0 (orthogonal to axis)
         idx = 0;
     }
@@ -84,25 +83,6 @@ uint32_t pauliColorMap(float geomInProd)
     }
     else
     { // ~1.00 (parallel to axis)
-=======
-    {
-        idx = 0;
-    }
-    else if (mag < 0.25f)
-    {
-        idx = 1;
-    }
-    else if (mag < 0.70f)
-    {
-        idx = 2;
-    }
-    else if (mag < 0.95f)
-    {
-        idx = 3;
-    }
-    else
-    {
->>>>>>> 3e632a6 (Implment new version of sketch code that use the updated firmware (inner state visualization support and non-blocking cycling))
         idx = 4;
     }
 
@@ -124,7 +104,6 @@ uint32_t entanglementColorMap(float geomInProd)
     const float mag = fabsf(geomInProd);
 
     uint8_t idx;
-<<<<<<< HEAD
     // hardcoded to be 90deg offset from tracking axis
     if (mag < 0.05f)
     { // ~1.00 (parallel to axis)
@@ -144,27 +123,6 @@ uint32_t entanglementColorMap(float geomInProd)
     }
     else
     { // ~1.0 (orthogonal to axis)
-=======
-
-    if (mag < 0.05f)
-    {
-        idx = 4;
-    }
-    else if (mag < 0.25f)
-    {
-        idx = 3;
-    }
-    else if (mag < 0.70f)
-    {
-        idx = 2;
-    }
-    else if (mag < 0.95f)
-    {
-        idx = 1;
-    }
-    else
-    {
->>>>>>> 3e632a6 (Implment new version of sketch code that use the updated firmware (inner state visualization support and non-blocking cycling))
         idx = 0;
     }
 
@@ -333,11 +291,7 @@ void initPixelLUT(const Qbead::Qbead &bead)
     pixelLUT[SOUTH_POLE_IDX] = {0.0f, 0.0f, 1.0f};
 
     const int pixelsPerLeg = bead.nsections - 1;
-<<<<<<< HEAD
     // First physical leg: pixel order runs from south toward north
-=======
-
->>>>>>> 3e632a6 (Implment new version of sketch code that use the updated firmware (inner state visualization support and non-blocking cycling))
     for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
     {
         const float theta =
@@ -348,11 +302,7 @@ void initPixelLUT(const Qbead::Qbead &bead)
             0.0f,
             Qbead::cos_deg(theta)};
     }
-<<<<<<< HEAD
     // Remaining physical legs: theta runs from north toward south
-=======
-
->>>>>>> 3e632a6 (Implment new version of sketch code that use the updated firmware (inner state visualization support and non-blocking cycling))
     for (int phiIndex = 1; phiIndex < bead.nlegs; phiIndex++)
     {
         const float phi = phiIndex * bead.phi_quant;
@@ -400,10 +350,7 @@ void loop()
     {
         Serial.print("Received visual: ");
         Serial.println(packet.value);
-<<<<<<< HEAD
         c_tap = 0;
-=======
->>>>>>> 3e632a6 (Implment new version of sketch code that use the updated firmware (inner state visualization support and non-blocking cycling))
         activateVisual(packet.value);
     }
     else if (packet.type == BLEManager::CommandType::ClearStates)
