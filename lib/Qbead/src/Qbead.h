@@ -61,6 +61,16 @@ namespace Qbead
     float T_imu;                                    // last update from the IMU
     bool tapped = false;
     bool tappedrecorded = false;
+    uint32_t stateColours[INNER_STATE_COUNT] = {
+        color(0, 0, 255),   // Blue
+        color(255, 0, 0),   // Red
+        color(0, 255, 0),   // Green
+        color(255, 255, 0), // Yellow
+        color(255, 0, 255), // Magenta
+        color(255, 128, 0)  // Orange
+    };
+    uint32_t cyclingIndex = 0;
+    uint32_t lastChange = 0;
 
     bool localEntangleRequestPending = false;
     uint32_t localEntangleRequestStartedAtMs = 0;
@@ -367,7 +377,7 @@ namespace Qbead
       BLEManager::DataPacket packet;
       if (!ble.takePacket(packet))
       {
-        return {BLEManager::CommandType::Tap, 0};
+        return {BLEManager::CommandType::None, 0};
       }
       return packet;
     }
