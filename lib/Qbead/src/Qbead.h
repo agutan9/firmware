@@ -14,6 +14,14 @@
 namespace Qbead
 {
 
+  enum class CommandType : uint8_t
+  {
+    None = 0,            // Reserved: no packet / empty packet buffer.
+    SetOrchestrator = 1, // Set or announce the entanglement orchestrator.
+    Bell0 = 2,           // Request Bell state (|00> + |11>) / sqrt(2).
+    Bell1 = 3            // Request Bell state (|01> + |10>) / sqrt(2).
+  };
+
   class Qbead
   {
   public:
@@ -358,6 +366,16 @@ namespace Qbead
       if (!ble.takePacket(packet))
       {
         return {BLEManager::CommandType::None, 0, 0, 0};
+      }
+      return packet;
+    }
+
+    BLEManager::DataPacket takeLatestPacket()
+    {
+      BLEManager::DataPacket packet;
+      if (!ble.takePacket(packet))
+      {
+        return {0, 0};
       }
       return packet;
     }
