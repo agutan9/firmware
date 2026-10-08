@@ -18,7 +18,8 @@ namespace Qbead
   class Qbead
   {
   public:
-    Qbead(const uint16_t pin00 = QB_LEDPIN,
+    Qbead(BLEManager::Role role = BLEManager::Role::Peripheral,
+          const uint16_t pin00 = QB_LEDPIN,
           const uint16_t pixelconfig = QB_PIXELCONFIG,
           const uint16_t nsections = QB_NSECTIONS,
           const uint16_t nlegs = QB_NLEGS,
@@ -411,7 +412,7 @@ namespace Qbead
       BLEManager::DataPacket packet;
       if (!ble.takePacket(packet))
       {
-        return {BLEManager::CommandType::None, 0};
+        return {BLEManager::CommandType::None, 0, 0, 0};
       }
       return packet;
     }
