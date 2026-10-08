@@ -75,10 +75,12 @@ namespace Qbead
     float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
     float t_acc, p_acc;                             // theta and phi according to gravity
+    // TODO
     //float T_imu;                                    // last update from the IMU TODO
     uint32_t T_imu;
-    bool tapped = false;
-    bool tappedrecorded = false;
+    volatile bool tapped = false;
+    volatile bool tappedrecorded = false;
+    // TODO (added volatile)
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
         color(255, 0, 0),   // Red
