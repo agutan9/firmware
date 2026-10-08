@@ -12,7 +12,7 @@ namespace BLEManager
     Tap = 1,
     AddState = 2,
     ClearStates = 3,
-    PreparedVisualizations = 4, // 1 Bell0,
+    PreparedVisualizations = 4,
     Entangle = 5,
     Measure = 6,
   };

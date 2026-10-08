@@ -118,10 +118,13 @@ namespace Qbead
     {
       callbackTarget = this;
       Serial.begin(9600);
-      //while (!Serial)
-      //  ; // TODO some form of warning or a way to give up if Serial never becomes available
+      // while (!Serial)
+      //   ; // TODO some form of warning or a way to give up if Serial never becomes available
       unsigned long t0 = millis();
-      while (!Serial && millis() - t0 < 15000) { ; }
+      while (!Serial && millis() - t0 < 15000)
+      {
+        ;
+      }
 
       pixels.begin();
       clear();
@@ -295,7 +298,8 @@ namespace Qbead
       return wasTapped;
     }
 
-    bool entangle(uint32_t state)
+    // localTrigger indicates the gesture for firing a local entanglement attempt
+    bool entangle(bool localTrigger, uint32_t state)
     {
       const uint32_t now = millis();
 
@@ -310,7 +314,7 @@ namespace Qbead
       }
 
       // Capture a newly detected local tap and send our request.
-      if (wasTapped())
+      if (localTrigger)
       {
         localEntangleRequestPending = true;
         localEntangleRequestStartedAtMs = now;
@@ -501,13 +505,14 @@ namespace Qbead
       return false;
     }
 
-    void displayCurrentStatesStatic()
+    // Hacky solution for the colours as it gives away inner implementation of the class
+    void displayCurrentStatesStatic(uint8_t colorOffset = 0)
     {
       this->clear();
       for (uint8_t i = 0; i < innerStateCount; i++)
       {
         const BlochVector &item = innerStates[i];
-        const uint32_t &itemColour = stateColours[i];
+        const uint32_t &itemColour = stateColours[(i + colorOffset) % INNER_STATE_COUNT];
 
         this->setBloch_deg(item, itemColour);
       }

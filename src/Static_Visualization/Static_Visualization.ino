@@ -96,7 +96,7 @@ void setCollapsedState(uint32_t outcome)
     BlochVector up(0, 0);
     BlochVector down(180, 0);
 
-    if (outcome == 1)
+    if (outcome == 0)
     {
         bead.addState(up);
     }
@@ -105,7 +105,7 @@ void setCollapsedState(uint32_t outcome)
         bead.addState(down);
     }
 
-    bead.displayCurrentStatesStatic();
+    bead.displayCurrentStatesStatic(outcome);
 }
 
 void collapse(uint32_t remoteOutcome)
@@ -145,7 +145,7 @@ void showRemoteRequestPending()
 
 void showEntanglementSuccess()
 {
-    bead.displayCurrentStatesStatic();
+    bead.displayCurrentStatesStatic(0);
 }
 
 void showTimeout()
@@ -181,7 +181,7 @@ void loop()
     if (!entangledDisplayActive)
     {
         // Taps are interpreted as entanglement requests here.
-        if (bead.entangle(ENTANGLED_STATE))
+        if (bead.entangle(bead.wasTapped(), ENTANGLED_STATE))
         {
             entangledDisplayActive = true;
             entangledAtMs = millis();
