@@ -28,6 +28,7 @@ void setup() {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 
 void loop() {
   static long last_event = 0;
@@ -151,6 +152,9 @@ void loop() {
 //  // Show the result.
 //  bead.show();
 //}
+=======
+
+>>>>>>> 55400e8 (Cleaned up commented out code in ShakeToMeasure)
 void loop() {
   static long last_event = 0;
   static uint32_t event_color = white;

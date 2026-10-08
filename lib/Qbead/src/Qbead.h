@@ -13,24 +13,6 @@
 
 namespace Qbead
 {
-<<<<<<< HEAD
-=======
-  // TODO
-  // Dit moet allemaal niet te veel tijd gaan kosten, lower prio, maar je perplexity chat
-  // over de refactor en arbitraire axis is veel info en moet even doorgespit worden
-  // Als we onderscheid willen kunnen maken tussen world X and Y axis just like the gravity axis
-  // wordt het complexer. Mijn idee, zet ze statisch met een callibratie stap. Meestal blijf jij
-  // als gebruiker in jouw wereld statisch staan. Er zou dan een config stap moeten komen 
-  // waarmee je de links/rechts x en voor/achter y zet. .. Mmmmh
-  // Ik zat helemaal te denken van, detect taps om arbitrair neiuwe X en Y te zetten maar..
-  // misschien is iets waarmee je kort naar blanke sphere gaat met de global X, Y en Z axis met 
-  // LEDs gekleurd veel simpler en beter. Dit soort callibratie/reset doe je meestal toch al
-  // voor de Poles gravity axis. Het enige wat je dan dient te doen die LEDs voor jezelf callibreren
-  // als je dan echt fancy wil zijn kan je de offset daarvan opslaan en de huidige coordinaten van
-  // alle in-play sphere elementen daarmee offsetten zodat de rotations die je doet voor de callibratie stap
-  // geen invloed hebben op de state die je voor je had...
-
->>>>>>> 8a6da81 (ReadIMU refactor functional. Tested and works even better now. Added customizable shake count. Still TODOs, mostly old changes in setupTapIMU which are correct but require final approval / deliberation)
   /**
    * @brief Detects a deliberate shake along one axis (currently the vertical, gravity axis).
    *
