@@ -157,6 +157,14 @@ namespace Qbead
       // Single-tap interrupt driven to pin 1
       imu.writeRegister(LSM6DS3_ACC_GYRO_MD1_CFG, LSM6DS3_ACC_GYRO_INT1_SINGLE_TAP_ENABLED);
 
+      // TODO
+      // Enable low pass filter and set cutoff frequency to datarate/400
+      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, LSM6DS3_ACC_GYRO_LPF2_XL_EN | LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_100);
+      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x60);
+      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x80);
+      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x00);
+      // TODO
+
       // Setup interrupt callback
       pinMode(PIN_LSM6DS3TR_C_INT1, INPUT);
       attachInterrupt(digitalPinToInterrupt(PIN_LSM6DS3TR_C_INT1), tap_isr, RISING);
@@ -555,16 +563,6 @@ namespace Qbead
       // Calculate (display) angles from the smoothed sphere-frame acceleration,
       theta_accvec = theta(x, y, z) * RAD_TO_DEG;
       phi_accvec = phi(x, y) * RAD_TO_DEG;
-
-      // TODO
-      float r[3];
-      r[0] = rx;
-      r[1] = rx;
-      r[2] = rx;
-      if (shake.update(r, delta*1e-6f, T_new)){
-        Serial.println("SHAKEN");
-      }
-      // TODO
 
       if (!tappedrecorded && tapped)
       {
