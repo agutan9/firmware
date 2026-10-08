@@ -561,9 +561,7 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz),
-          shake(),
-          gravity()
+          sx(sx), sy(sy), sz(sz)
     {
     }
 
@@ -697,11 +695,6 @@ namespace Qbead
       postConfigIMU_TapDetection();
       // postConfigIMU_ShakeDetection: 
       // Shake is software based. Only relevant registers are the LPF due to high-freq acc attenuation
-
-      // TODO
-      uint8_t id; imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
-      Serial.println(id, HEX);
-      // TODO
 
       ble.beginDualRole();
     }
