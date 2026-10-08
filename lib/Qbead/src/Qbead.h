@@ -13,21 +13,6 @@
 
 namespace Qbead
 {
-  // TODO
-  // Dit moet allemaal niet te veel tijd gaan kosten, lower prio, maar je perplexity chat
-  // over de refactor en arbitraire axis is veel info en moet even doorgespit worden
-  // Als we onderscheid willen kunnen maken tussen world X and Y axis just like the gravity axis
-  // wordt het complexer. Mijn idee, zet ze statisch met een callibratie stap. Meestal blijf jij
-  // als gebruiker in jouw wereld statisch staan. Er zou dan een config stap moeten komen 
-  // waarmee je de links/rechts x en voor/achter y zet. .. Mmmmh
-  // Ik zat helemaal te denken van, detect taps om arbitrair neiuwe X en Y te zetten maar..
-  // misschien is iets waarmee je kort naar blanke sphere gaat met de global X, Y en Z axis met 
-  // LEDs gekleurd veel simpler en beter. Dit soort callibratie/reset doe je meestal toch al
-  // voor de Poles gravity axis. Het enige wat je dan dient te doen die LEDs voor jezelf callibreren
-  // als je dan echt fancy wil zijn kan je de offset daarvan opslaan en de huidige coordinaten van
-  // alle in-play sphere elementen daarmee offsetten zodat de rotations die je doet voor de callibratie stap
-  // geen invloed hebben op de state die je voor je had...
-
   /**
    * @brief Detects a deliberate shake along one axis (currently the vertical, gravity axis).
    *
@@ -192,6 +177,16 @@ namespace Qbead
 
       // 2. Shake axis. Currently this is the gravity direction (vertical shakes).
       //    FUTURE: replace this block to select another axis (e.g. world X or Y).
+      //    TODO PR: This can be extended to track world X or Y. 
+      //    However, these are not as constant as world Z and would need some further work
+      //    1. If you rotate the way you are interfacing with the device the world X or Y
+      //       would not notice. If you turn 90deg your left-right (X) is now mapped to
+      //       what was front-back (Y)
+      //    2. Hence we would likely need a callibration step. Not impossible to implement,
+      //       but also not trivial
+      //    3. Any-shake in the X-Y plane would get around this but also requires some
+      //       non-trivial extension to current code
+      //    4. Without a magnometer the axis might drift over-time (would need further looking into)
       float gravityNorm = sqrtf(gravityEstimate[0]*gravityEstimate[0] +
                                 gravityEstimate[1]*gravityEstimate[1] +
                                 gravityEstimate[2]*gravityEstimate[2]);
@@ -431,9 +426,7 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz),
-          shake(),
-          gravity()
+          sx(sx), sy(sy), sz(sz)
     {
     }
 
@@ -454,28 +447,18 @@ namespace Qbead
     const uint8_t ix, iy, iz;
     const bool sx, sy, sz;
     float rbuffer[3];
-    float whentapped_buffer[3]= {0.f, 0.f, 1.f};;
+    float whentapped_buffer[3]= {0.f, 0.f, 1.f};
     float whenshaken_buffer[3]= {0.f, 0.f, 1.f};    /**< Unit shake axis (sphere frame) at the start of the last shake. */
     float gyroBiasDps[3] = {0.f, 0.f, 0.f};         /**< Learned gyro zero-rate offset (deg/s), subtracted from every reading. */
     float x_whentapped, y_whentapped, z_whentapped; /**< set when wasTapped is called */
     float x_whenshaken, y_whenshaken, z_whenshaken; /**< set when wasShaken is called */
     float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
-    float t_acc, p_acc;                             // theta and phi according to gravity
+    float t_acc, p_acc;             // TODO: why put these here? is this comment even correct?? ->     // theta and phi according to gravity
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
     bool shaken = false;
     uint32_t T_imu; // last update from the IMU
 
-    uint32_t stateColours[INNER_STATE_COUNT] = {
-        color(0, 0, 255),   // Blue
-        color(255, 0, 0),   // Red
-        color(0, 255, 0),   // Green
-        color(255, 255, 0), // Yellow
-        color(255, 0, 255), // Magenta
-        color(255, 128, 0)  // Orange
-    };
-    uint32_t cyclingIndex = 0;
-    uint32_t lastChange = 0;
 
     bool localEntangleRequestPending = false;
     uint32_t localEntangleRequestStartedAtMs = 0;
@@ -493,17 +476,33 @@ namespace Qbead
     uint32_t cyclingIndex = 0;
     uint32_t lastChange = 0;
 
-    void setupIMUTapDetection()
+  
+    // FUTURE: PR TODO
+    // In order to actually be able to set gyroOn to false readIMU needs refactoring
+    // to not use gravityTracker and let shakeDetector use its internal acc only method
+    /** Driver settings, written into the registers by imu.begin(). */
+    void preConfigIMU_Settings(bool gyroOn = true)
     {
-      // TODO already done in begin() using settings struct
-      // Turn on the accelerometer
-      // Acc = 416Hz (High-Performance mode)
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL1_XL, LSM6DS3_ACC_GYRO_ODR_XL_416Hz);
-      // TODO
+      imu.settings.accelRange      = 8;     // g: no clipping on shakes; tap threshold units scale with this
+      imu.settings.accelSampleRate = 416;   // Hz, high-performance mode
+      imu.settings.accelBandWidth  = 400;   // TR-C: LPF1 at ODR/2 (analog bandwidth is fixed at this ODR)
+      imu.settings.gyroEnabled     = gyroOn;  // required by the gravity tracker
+      imu.settings.gyroSampleRate  = 416;
+      // imu.settings.gyroRange    = 1000;  // optional: finer resolution than the 2000 dps default
+    }
 
-      // Optionally, disable gyroscope to save power
-      // imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL2_G, LSM6DS3_ACC_GYRO_ODR_G_POWER_DOWN);
+    // PR TODO:
+    // FUTURE: add switch case for different ODR_X bandwidhts?
+    // Seems silly but is general to both tap and shake and there are many more filter registers which we currently don't set
+    void postConfigIMU_Filters()
+    {
+      // Enable low pass filter and set cutoff frequency to datarate/100. Smaller cut-offs might attenuate shake detection.
+      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, LSM6DS3_ACC_GYRO_LPF2_XL_EN | LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_100);
+    }
 
+    // Sets the main isr interrupt
+    void postConfigIMU_TapDetection()
+    {
       // Enable tap detection in X,Y,Z:
       uint8_t TAP_CFG_SETTING = LSM6DS3_ACC_GYRO_TIMER_EN_ENABLED | LSM6DS3_ACC_GYRO_TAP_Z_EN_ENABLED | LSM6DS3_ACC_GYRO_TAP_Y_EN_ENABLED | LSM6DS3_ACC_GYRO_TAP_X_EN_ENABLED;
       imu.writeRegister(LSM6DS3_ACC_GYRO_TAP_CFG1, TAP_CFG_SETTING);
@@ -512,10 +511,7 @@ namespace Qbead
       imu.writeRegister(LSM6DS3_ACC_GYRO_INT_DUR2, LSM6DS3_ACC_GYRO_SHOCK_MASK & 0b11);
 
       // Set tap threshold:
-      // TODO
-      //uint8_t thrshold_setting = 8; // number between 0 and 31
-      uint8_t threshold_setting = 2;
-      // TODO
+      uint8_t threshold_setting = 2; // number between 0 and 31
       imu.writeRegister(LSM6DS3_ACC_GYRO_TAP_THS_6D, threshold_setting);
 
       // Only do single tap detection. Seems like the naming is incorrect?
@@ -525,27 +521,18 @@ namespace Qbead
       // Single-tap interrupt driven to pin 1
       imu.writeRegister(LSM6DS3_ACC_GYRO_MD1_CFG, LSM6DS3_ACC_GYRO_INT1_SINGLE_TAP_ENABLED);
 
-      // TODO
-      // Enable low pass filter and set cutoff frequency to datarate/400
-      imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, LSM6DS3_ACC_GYRO_LPF2_XL_EN | LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_100);
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x60);
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x80);
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL8_XL, 0x00);
-      // TODO
-
       // Setup interrupt callback
       pinMode(PIN_LSM6DS3TR_C_INT1, INPUT);
       attachInterrupt(digitalPinToInterrupt(PIN_LSM6DS3TR_C_INT1), tap_isr, RISING);
 
-      Serial.println("Enabled IMU interrupt!");
+      Serial.println("Enabled IMU tap interrupt!");
     }
 
     void begin()
     {
       callbackTarget = this;
       Serial.begin(9600);
-      // while (!Serial)
-      //   ; // TODO some form of warning or a way to give up if Serial never becomes available
+      // Wait for Serial to become available or hit a time-out before continuing
       unsigned long t0 = millis();
       while (!Serial && millis() - t0 < 15000)
       {
@@ -556,15 +543,7 @@ namespace Qbead
       clear();
       setBrightness(10);
 
-      // TODO
-      // These settings are used by the imu class. Only directly setting the registers as in
-      // setup_IMU_Tap_detection doesn't also schange the settings struct.
-      // While IMU.begin does copy the settings struct
-      imu.settings.accelRange      = 8;     // ±8 g: no clipping on shakes
-      imu.settings.accelSampleRate = 416;
-      imu.settings.accelBandWidth  = 400;   // keeps your current 400 Hz analog BW
-      imu.settings.gyroEnabled = true; // maybe off?
-      // TODO
+      preConfigIMU_Settings(); // fills imu.settings; must run before imu.begin()
 
       Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
       if (!imu.begin())
@@ -576,12 +555,10 @@ namespace Qbead
         Serial.println("[ERROR]{IMU} IMU failed to initialize");
       }
 
-      setupIMUTapDetection();
-
-      // TODO
-      uint8_t id; imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
-      Serial.println(id, HEX);
-      // TODO
+      postConfigIMU_Filters();
+      postConfigIMU_TapDetection();
+      // postConfigIMU_ShakeDetection: 
+      // Shake is software based. Only relevant registers are the LPF due to high-freq acc attenuation
 
       ble.beginDualRole();
     }
@@ -732,14 +709,10 @@ namespace Qbead
       // save tapped location
       if (wasTapped)
       {
-        // TODO: ALready in Sphere coordinates
-        //x_whentapped = whentapped_buffer[ix];
-        //y_whentapped = whentapped_buffer[iy];
-        //z_whentapped = whentapped_buffer[iz];
+        // buffer already holds sphere-frame values; don't need ix/iy/iz
         x_whentapped = whentapped_buffer[0];
         y_whentapped = whentapped_buffer[1];
         z_whentapped = whentapped_buffer[2];
-        // TODO
       }
       return wasTapped;
     }
@@ -841,7 +814,6 @@ namespace Qbead
     }
 
 
-
     void readIMU(bool print = true)
     {
       rbuffer[0] = imu.readFloatAccelX();
@@ -852,38 +824,14 @@ namespace Qbead
       rz = (1 - 2 * sz) * rbuffer[iz];
       float rawmag2 = rx * rx + ry * ry + rz * rz;
 
-      uint32_t T_new = micros(); //TODO: Can lose resolution after ~3-4h
+      uint32_t T_new = micros();
       uint32_t delta = T_new - T_imu;
       float dt = delta*1e-6f;
       T_imu = T_new;
       const float T = 100000; // 100 ms // TODO make the filter timeconstant configurable
+      // PR: This is an old TODO olready present. Will refactor it before final PR merge
 
-      //// TODO
-      //// Gravity tracking + shake detection (exactly one shake.update per call)
-      //float wc[3] = { imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ() };  // dps, sphere frame
-      //float am = sqrtf(rawmag2);
-      //float wm2 = 0;
-      //for (int i = 0; i < 3; i++) 
-      //{ 
-      //  float d = wc[i] - gyroBiasDps[i];
-      //  wm2 += d*d;
-      // }
-      //if (fabsf(am - 1.f) < 0.03f && wm2 < 9.f)  // still: learn bias
-      //  for (int i = 0; i < 3; i++) gyroBiasDps[i] += 0.002f * (wc[i] - gyroBiasDps[i]);
-      //float w[3] = { (1-2*sx)*(wc[ix]-gyroBiasDps[ix]),
-      //               (1-2*sy)*(wc[iy]-gyroBiasDps[iy]),
-      //               (1-2*sz)*(wc[iz]-gyroBiasDps[iz]) };
-      //float r[3] = {rx, ry, rz};
-//
-      //gravity.update(r, w, dt);   // handles gaps and (re)seeding itself
-      //if (gravity.isInitialised && shake.update(r, dt, millis(), gravity.gravityEstimate))
-      //{
-      //  for (int i = 0; i < 3; i++) whenshaken_buffer[i] = shake.shakeAxisAtStart[i];
-      //  shaken = true;
-      //}
-      // Gravity tracking + Shake detection (exactly one shake.update per call)
-
-      // Gyro: read in the chip frame, learn the zero-rate offset while still, then map to the sphere frame.
+      // Process Gyro: read in the chip frame, learn the zero-rate offset while still, then map to the sphere frame.
       const float stillAccelTolerance = 0.03f;       // |accel| within this many g of 1 g counts as still
       const float stillGyroMaxSquaredDps2 = 9.f;     // (3 deg/s)^2: rotation below this counts as still
       const float biasLearningGain = 0.002f;         // fraction of the error absorbed per call
@@ -906,7 +854,7 @@ namespace Qbead
                                  (1 - 2*sy) * (gyroChipDps[iy] - gyroBiasDps[iy]),
                                  (1 - 2*sz) * (gyroChipDps[iz] - gyroBiasDps[iz]) };
       float accelSphere[3] = { rx, ry, rz };           // g, sphere frame, unsmoothed
-
+      // Track gravity and check for shakes
       gravity.update(accelSphere, gyroSphereDps, dt);  // handles gaps and (re)seeding itself
       if (gravity.isInitialised &&
           shake.update(accelSphere, dt, millis(), gravity.gravityEstimate))
@@ -914,7 +862,6 @@ namespace Qbead
         for (int i = 0; i < 3; i++) whenshaken_buffer[i] = shake.shakeAxisAtStart[i];
         shaken = true;
       }
-      // TODO
 
       // Only activate smoothing filter if read gap is small enough
       if (delta > T)
@@ -932,18 +879,15 @@ namespace Qbead
       }
       float mag2 = x * x + y * y + z * z;
 
-      // TODO
+      // TODO PR: Old codebase code needs small refactor
       // polar and azimuth angles of the smoothed acceleration vector in the sensor frame
       // NOT rotational accellerations values. Maybe rename?
-      // t_acc = theta(x, y, z) * 180 / 3.14159;
-      // p_acc = phi(x, y) * 180 / 3.14159;
       t_acc = theta(x, y, z) * RAD_TO_DEG;
       p_acc = phi(x, y) * RAD_TO_DEG;
-      // TODO
       if (p_acc < 0)
       {
         p_acc += 360;
-      } // to bring it to [0,360] range
+      } // to bring it to [0,360) range
 
       if (!tappedrecorded && tapped)
       {
