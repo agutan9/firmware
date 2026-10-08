@@ -76,7 +76,9 @@ namespace Qbead
     volatile bool tapped = false;
     volatile bool tappedrecorded = false;
     bool shaken = false;
-    uint32_t T_imu; // last update from the IMU
+    float x = 0.f, y = 0.f, z = 0.f;
+    float rx = 0.f, ry = 0.f, rz = 0.f;
+    uint32_t T_imu = 0;
 
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
@@ -88,6 +90,8 @@ namespace Qbead
     };
     uint32_t cyclingIndex = 0;
     uint32_t lastChange = 0;
+    uint32_t accelSmoothingTimeUs = 100000; // Accelerometer smoothing, set to 0 to disable
+    bool hasAccelSample = false;
 
 
     bool localEntangleRequestPending = false;
@@ -414,7 +418,8 @@ namespace Qbead
       return false;
     bool wasShaken()
     {
-      if (!shaken) return false;
+      if (!shaken)
+        return false;
       shaken = false;
       x_whenshaken = whenshaken_buffer[0];
       y_whenshaken = whenshaken_buffer[1];
@@ -475,7 +480,6 @@ namespace Qbead
       callbackTarget->tapped = true;
     }
 
-
     void readIMU(bool print = true)
     {
       rbuffer[0] = imu.readFloatAccelX();
@@ -490,17 +494,15 @@ namespace Qbead
       uint32_t delta = T_new - T_imu;
       float dt = delta * 1e-6f;
       T_imu = T_new;
-      const float T = 100000; // 100 ms // TODO make the filter timeconstant configurable
-      // PR: This is an old TODO olready present. Will refactor it before final PR merge
 
       // Process Gyro: read in the chip frame, learn the zero-rate offset while still, then map to the sphere frame.
-      const float stillAccelTolerance = 0.03f;       // |accel| within this many g of 1 g counts as still
-      const float stillGyroMaxSquaredDps2 = 9.f;     // (3 deg/s)^2: rotation below this counts as still
-      const float biasLearningGain = 0.002f;         // fraction of the error absorbed per call
+      const float stillAccelTolerance = 0.03f;   // |accel| within this many g of 1 g counts as still
+      const float stillGyroMaxSquaredDps2 = 9.f; // (3 deg/s)^2: rotation below this counts as still
+      const float biasLearningGain = 0.002f;     // fraction of the error absorbed per call
 
-      float gyroChipDps[3] = { imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ() };  // deg/s, chip frame
-      float accelMagnitude = sqrtf(rawmag2);          // unit of g
-      float gyroResidualSquaredDps2 = 0;              // squared rate left after bias removal
+      float gyroChipDps[3] = {imu.readFloatGyroX(), imu.readFloatGyroY(), imu.readFloatGyroZ()}; // deg/s, chip frame
+      float accelMagnitude = sqrtf(rawmag2);                                                     // unit of g
+      float gyroResidualSquaredDps2 = 0;                                                         // squared rate left after bias removal
       for (int i = 0; i < 3; i++)
       {
         float gyroResidualDps = gyroChipDps[i] - gyroBiasDps[i];
