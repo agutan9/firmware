@@ -27,46 +27,10 @@ void setup() {
   bead.testPixels();
 }
 
-void loop() {
-  static long last_event = 0;
-  static uint32_t event_color = white;
-
-  bead.clear();
-  bead.readIMU(false);          // must run every loop: it feeds the gravity tracker and shake detector
-
-  if (bead.wasShaken()) {
-    last_event = millis();
-    BlochVector acc_vector(bead.x_whenshaken, bead.y_whenshaken, bead.z_whenshaken);
-
-    float probability = pow(innerProductAbs(current_state, acc_vector), 2);
-    float threshold = random(0, 100) / 100.0f;
-    float identity_threshold = 0.9;
-    Serial.print("probability: ");
-    Serial.println(probability);
-    Serial.print("threshold: ");
-    Serial.println(threshold);
-    if (probability > identity_threshold) {
-      event_color = red;
-      Serial.println("red identity");
-    } else if (probability < 1 - identity_threshold) {
-      event_color = blue;
-      Serial.println("blue identity");
-    } else if (probability > threshold) {
-      current_state = acc_vector;
-      event_color = red;
-      Serial.println("red random");
-    } else {
-      current_state = -acc_vector;
-      event_color = blue;
-      Serial.println("blue random");
-    }
-  }
-
-  float delta = max(min(millis() - last_event, 2000), 0) / 2000.0;
-  uint32_t color = addColor(scaleColor(1 - delta, event_color), scaleColor(delta, white));
-  bead.setBloch_deg(current_state, color);
-  bead.show();
-}
+// ## Event loop
+//
+// The loop function is called repeatedly until the Qbead is powered off.
+// It is used to read the IMU and update the current state of the game.
 float delta = 0.0;
 float beta = 0.0;
 bool clean = false;

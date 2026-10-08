@@ -36,7 +36,9 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz)
+          sx(sx), sy(sy), sz(sz),
+          // TODO: REFACTOR
+          shake()
     {
     }
 
@@ -548,12 +550,18 @@ namespace Qbead
       theta_accvec = theta(x, y, z) * RAD_TO_DEG;
       phi_accvec = phi(x, y) * RAD_TO_DEG;
 
-      // Wrap azimuth into [0, 360).
-      if (phi_accvec < 0)
-      {
-        phi_accvec += 360;
+      // TODO
+      float r[3];
+      r[0] = rx;
+      r[1] = rx;
+      r[2] = rx;
+      if (shake.update(r, delta*1e-6f, T_new)){
+        Serial.println("SHAKEN");
       }
-      
+      Serial.print("Swings: ");
+      Serial.println(shake.getSwings());
+      // TODO
+
       if (!tappedrecorded && tapped)
       {
         tappedrecorded = true;
