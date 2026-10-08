@@ -287,6 +287,7 @@ namespace Qbead
       return false;
     }
   };
+  // TODO: Leave these as structs? Or integrate fully as disparate methods and variables/constants
   struct GravityTracker {
     float g[3] = {0, 0, 1}; bool init = false;
     void update(const float a[3], const float w_dps[3], float dt) {   // chip frame!
