@@ -426,7 +426,9 @@ namespace Qbead
           theta_quant(180 / nsections),
           phi_quant(360 / nlegs),
           ix(ix), iy(iy), iz(iz),
-          sx(sx), sy(sy), sz(sz)
+          sx(sx), sy(sy), sz(sz),
+          // TODO: REFACTOR
+          shake()
     {
     }
 
@@ -475,6 +477,7 @@ namespace Qbead
     };
     uint32_t cyclingIndex = 0;
     uint32_t lastChange = 0;
+
 
   
     // FUTURE: PR TODO
