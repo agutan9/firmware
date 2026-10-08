@@ -13,6 +13,24 @@
 
 namespace Qbead
 {
+<<<<<<< HEAD
+=======
+  // TODO
+  // Dit moet allemaal niet te veel tijd gaan kosten, lower prio, maar je perplexity chat
+  // over de refactor en arbitraire axis is veel info en moet even doorgespit worden
+  // Als we onderscheid willen kunnen maken tussen world X and Y axis just like the gravity axis
+  // wordt het complexer. Mijn idee, zet ze statisch met een callibratie stap. Meestal blijf jij
+  // als gebruiker in jouw wereld statisch staan. Er zou dan een config stap moeten komen 
+  // waarmee je de links/rechts x en voor/achter y zet. .. Mmmmh
+  // Ik zat helemaal te denken van, detect taps om arbitrair neiuwe X en Y te zetten maar..
+  // misschien is iets waarmee je kort naar blanke sphere gaat met de global X, Y en Z axis met 
+  // LEDs gekleurd veel simpler en beter. Dit soort callibratie/reset doe je meestal toch al
+  // voor de Poles gravity axis. Het enige wat je dan dient te doen die LEDs voor jezelf callibreren
+  // als je dan echt fancy wil zijn kan je de offset daarvan opslaan en de huidige coordinaten van
+  // alle in-play sphere elementen daarmee offsetten zodat de rotations die je doet voor de callibratie stap
+  // geen invloed hebben op de state die je voor je had...
+
+>>>>>>> 8a6da81 (ReadIMU refactor functional. Tested and works even better now. Added customizable shake count. Still TODOs, mostly old changes in setupTapIMU which are correct but require final approval / deliberation)
   /**
    * @brief Detects a deliberate shake along one axis (currently the vertical, gravity axis).
    *
@@ -287,32 +305,6 @@ namespace Qbead
       return false;
     }
   };
-
-
-  /**
-   * @brief Tracks the gravity direction by fusing gyroscope and accelerometer.
-   *
-   * Each step rotates the estimate with the gyro (accurate during motion) and then
-   * pulls it slowly toward the accelerometer (corrects drift). The pull is weighted
-   * by how close |accel| is to 1 g, so shakes and impacts barely disturb it.
-   * All vectors are in the sphere frame; the axis mapping must be a proper rotation
-   * (determinant +1), as for your ix/iy/iz and sx/sy/sz.
-   */
-  //struct GravityTracker {
-  //  float g[3] = {0, 0, 1}; bool init = false;
-  //  void update(const float a[3], const float w_dps[3], float dt) {   // chip frame!
-  //    const float D2R = 0.0174533f, TAU = 1.5f;
-  //    if (!init) { memcpy(g, a, sizeof g); init = true; return; }
-  //    float w[3] = {w_dps[0]*D2R, w_dps[1]*D2R, w_dps[2]*D2R};
-  //    float c[3] = {w[1]*g[2]-w[2]*g[1], w[2]*g[0]-w[0]*g[2], w[0]*g[1]-w[1]*g[0]};
-  //    for (int i = 0; i < 3; i++) g[i] -= c[i]*dt;                    // predict
-  //    float am  = sqrtf(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
-  //    float k   = (dt/TAU) * fmaxf(0.f, 1.f - fabsf(am - 1.f)/0.3f);   // trust accel near 1 g
-  //    for (int i = 0; i < 3; i++) g[i] += k*(a[i] - g[i]);            // correct
-  //    float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
-  //    for (int i = 0; i < 3; i++) g[i] /= gm;
-  //  }
-  //};
 
   /**
    * @brief Tracks the gravity direction by fusing gyroscope and accelerometer readings.
