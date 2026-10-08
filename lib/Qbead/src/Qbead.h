@@ -287,6 +287,22 @@ namespace Qbead
       return false;
     }
   };
+  struct GravityTracker {
+    float g[3] = {0, 0, 1}; bool init = false;
+    void update(const float a[3], const float w_dps[3], float dt) {   // chip frame!
+      const float D2R = 0.0174533f, TAU = 1.5f;
+      if (!init) { memcpy(g, a, sizeof g); init = true; return; }
+      float w[3] = {w_dps[0]*D2R, w_dps[1]*D2R, w_dps[2]*D2R};
+      float c[3] = {w[1]*g[2]-w[2]*g[1], w[2]*g[0]-w[0]*g[2], w[0]*g[1]-w[1]*g[0]};
+      for (int i = 0; i < 3; i++) g[i] -= c[i]*dt;                    // predict
+      float am  = sqrtf(a[0]*a[0] + a[1]*a[1] + a[2]*a[2]);
+      float k   = (dt/TAU) * fmaxf(0.f, 1.f - fabsf(am - 1.f)/0.3f);   // trust accel near 1 g
+      for (int i = 0; i < 3; i++) g[i] += k*(a[i] - g[i]);            // correct
+      float gm = sqrtf(g[0]*g[0] + g[1]*g[1] + g[2]*g[2]);
+      for (int i = 0; i < 3; i++) g[i] /= gm;
+    }
+  };
+  // TODO END
 
   /**
    * @brief Tracks the gravity direction by fusing gyroscope and accelerometer readings.
@@ -428,7 +444,8 @@ namespace Qbead
           ix(ix), iy(iy), iz(iz),
           sx(sx), sy(sy), sz(sz),
           // TODO: REFACTOR
-          shake()
+          shake(),
+          gravity()
     {
     }
 
@@ -887,40 +904,15 @@ namespace Qbead
       }
       float mag2 = x * x + y * y + z * z;
 
-<<<<<<< HEAD
       // TODO PR: Old codebase code needs small refactor
       // polar and azimuth angles of the smoothed acceleration vector in the sensor frame
       // NOT rotational accellerations values. Maybe rename?
       t_acc = theta(x, y, z) * RAD_TO_DEG;
       p_acc = phi(x, y) * RAD_TO_DEG;
-=======
-      // TODO
-      // polar and azimuth angles of the smoothed acceleration vector in the sensor frame
-      // NOT rotational accellerations values. Maybe rename?
-      // t_acc = theta(x, y, z) * 180 / 3.14159;
-      // p_acc = phi(x, y) * 180 / 3.14159;
-      t_acc = theta(x, y, z) * RAD_TO_DEG;
-      p_acc = phi(x, y, z) * RAD_TO_DEG;
-      // TODO
->>>>>>> 5cac799 (Small changes in readIMU and IMU setup. Mostly fixes and further dev testing. The old code was less correct than initially expected)
       if (p_acc < 0)
       {
         p_acc += 360;
-<<<<<<< HEAD
       } // to bring it to [0,360) range
-=======
-      } // to bring it to [0,360] range
-
-      // TODO
-      float r[3];
-      r[0] = rx;
-      r[1] = rx;
-      r[2] = rx;
-      if (shake.update(r, delta*1e-6f, T_new)){
-        Serial.println("SHAKEN");
-      }
-      // TODO
->>>>>>> ad8d27d (Refactored shaken to watch for two amplitude swaps in short succession instead of counting swings. Match imu.settings struct to registers instead of only setting the registers manually after doing imu.begin (scaling issues in IMU.read because of this))
 
       if (!tappedrecorded && tapped)
       {
