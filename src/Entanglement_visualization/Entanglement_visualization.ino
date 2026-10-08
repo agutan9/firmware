@@ -21,7 +21,6 @@ struct PixelAxis
     float y;
     float z;
 };
-
 struct HSVBand
 {
     uint16_t hue;
