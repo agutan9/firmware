@@ -895,7 +895,21 @@ namespace Qbead
       if (p_acc < 0)
       {
         p_acc += 360;
+<<<<<<< HEAD
       } // to bring it to [0,360) range
+=======
+      } // to bring it to [0,360] range
+
+      // TODO
+      float r[3];
+      r[0] = rx;
+      r[1] = rx;
+      r[2] = rx;
+      if (shake.update(r, delta*1e-6f, T_new)){
+        Serial.println("SHAKEN");
+      }
+      // TODO
+>>>>>>> ad8d27d (Refactored shaken to watch for two amplitude swaps in short succession instead of counting swings. Match imu.settings struct to registers instead of only setting the registers manually after doing imu.begin (scaling issues in IMU.read because of this))
 
       if (!tappedrecorded && tapped)
       {
