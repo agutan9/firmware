@@ -11,6 +11,6 @@ void setup() {
 void loop() {
   bead.readIMU();
   bead.clear();
-  bead.setBloch_deg_smooth(bead.t_acc, bead.p_acc, color(255, 0, 255));
+  bead.setBloch_deg_smooth(bead.t_acc, bead.p_acc, Qbead::color(255, 0, 255));
   bead.show();
 }
