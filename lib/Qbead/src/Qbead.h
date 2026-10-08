@@ -38,7 +38,8 @@ namespace Qbead
           ix(ix), iy(iy), iz(iz),
           sx(sx), sy(sy), sz(sz),
           // TODO: REFACTOR
-          shake()
+          shake(),
+          gravity()
     {
     }
 
