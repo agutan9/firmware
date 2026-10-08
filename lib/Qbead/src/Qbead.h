@@ -11,6 +11,7 @@
 #include "internal/QbeadUtils.h"
 #include "internal/QbeadBLE.h"
 #include "internal/ShakeDetector.h"
+#include "internal/GravityTracker.h"
 
 namespace Qbead
 {
@@ -667,7 +668,7 @@ namespace Qbead
 
       preConfigIMU_Settings(); // fills imu.settings; must run before imu.begin()
 
-      Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
+      Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3T-RC compiled on " __DATE__ " at " __TIME__);
       if (!imu.begin())
       {
         Serial.println("[DEBUG]{IMU} IMU initialized correctly");
@@ -679,8 +680,8 @@ namespace Qbead
 
       postConfigIMU_Filters();
       postConfigIMU_TapDetection();
-      // postConfigIMU_ShakeDetection:
-      // Shake is software based. Only relevant registers are the LPF due to high-freq acc attenuation
+      // postConfigIMU_ShakeDetection: Shake is software based. 
+      // Only relevant registers are the LPF's due to high-freq acc attenuation
 
       ble.beginDualRole();
     }
@@ -951,6 +952,9 @@ namespace Qbead
       float dt = delta * 1e-6f;
       T_imu = T_new;
 
+      // TODO: Should these be public class members? Possibly
+      // TODO: FUTURE:
+      //    Refactor such that gyroscope can (shake and gravity) can be turned off
       // Process Gyro: read in the chip frame, learn the zero-rate offset while still, then map to the sphere frame.
       const float stillAccelTolerance = 0.03f;   // |accel| within this many g of 1 g counts as still
       const float stillGyroMaxSquaredDps2 = 9.f; // (3 deg/s)^2: rotation below this counts as still
@@ -1007,7 +1011,6 @@ namespace Qbead
       float mag2 = x * x + y * y + z * z;
 
       // Calculate (display) angles from the smoothed sphere-frame acceleration,
-      // not from gravity.gravityEstimate.
       theta_accvec = theta(x, y, z) * RAD_TO_DEG;
       phi_accvec = phi(x, y) * RAD_TO_DEG;
 

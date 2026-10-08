@@ -280,6 +280,7 @@ struct ShakeDetector
             peakToPeakAmplitude > minPeakToPeakAmplitude &&
             nowMillis - lastShakeTimeMs > cooldownMs)
         {
+            Serial.println("[INFO]{SHAKE_DETECT} Shake gesture was detected!");
             hasPositivePeak = hasNegativePeak = false;
             alternatingPeakCount = 0;
             lastPeakSign = 0;
