@@ -200,6 +200,11 @@ namespace Qbead
       Serial.println(id, HEX);
       // TODO
 
+      // TODO
+      uint8_t id; imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
+      Serial.println(id, HEX);
+      // TODO
+
       ble.beginDualRole();
     }
 
