@@ -14,14 +14,6 @@
 namespace Qbead
 {
 
-  enum class CommandType : uint8_t
-  {
-    None = 0,            // Reserved: no packet / empty packet buffer.
-    SetOrchestrator = 1, // Set or announce the entanglement orchestrator.
-    Bell0 = 2,           // Request Bell state (|00> + |11>) / sqrt(2).
-    Bell1 = 3            // Request Bell state (|01> + |10>) / sqrt(2).
-  };
-
   class Qbead
   {
   public:
@@ -375,7 +367,7 @@ namespace Qbead
       BLEManager::DataPacket packet;
       if (!ble.takePacket(packet))
       {
-        return {0, 0};
+        return {BLEManager::CommandType::Tap, 0};
       }
       return packet;
     }
@@ -541,7 +533,18 @@ namespace Qbead
     {
       if (innerStateCount == 0)
       {
-        return;
+        const BlochVector &item = innerStates[i];
+
+        float thetaDifference = fabsf(item.theta - state.theta);
+
+        float phiDifference = fabsf(item.phi - state.phi);
+        phiDifference = min(phiDifference, 360.0f - phiDifference);
+
+        if (thetaDifference <= thetaTolerance &&
+            phiDifference <= phiTolerance)
+        {
+          return true;
+        }
       }
       uint32_t currentTime = millis();
       uint32_t deltaTime = currentTime - lastChange;
