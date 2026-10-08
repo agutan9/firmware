@@ -486,7 +486,6 @@ namespace Qbead
     /** Driver settings, written into the registers by imu.begin(). */
     void preConfigIMU_Settings(bool gyroOn = true)
     {
-<<<<<<< HEAD
       imu.settings.accelRange      = 8;     // g: no clipping on shakes; tap threshold units scale with this
       imu.settings.accelSampleRate = 416;   // Hz, high-performance mode
       imu.settings.accelBandWidth  = 400;   // TR-C: LPF1 at ODR/2 (analog bandwidth is fixed at this ODR)
@@ -494,13 +493,6 @@ namespace Qbead
       imu.settings.gyroSampleRate  = 416;
       // imu.settings.gyroRange    = 1000;  // optional: finer resolution than the 2000 dps default
     }
-=======
-      // TODO already done in begin() using settings struct
-      // Turn on the accelerometer
-      // Acc = 416Hz (High-Performance mode)
-      //imu.writeRegister(LSM6DS3_ACC_GYRO_CTRL1_XL, LSM6DS3_ACC_GYRO_ODR_XL_416Hz);
-      // TODO
->>>>>>> 5cac799 (Small changes in readIMU and IMU setup. Mostly fixes and further dev testing. The old code was less correct than initially expected)
 
     // PR TODO:
     // FUTURE: add switch case for different ODR_X bandwidhts?
@@ -554,18 +546,7 @@ namespace Qbead
       clear();
       setBrightness(10);
 
-<<<<<<< HEAD
       preConfigIMU_Settings(); // fills imu.settings; must run before imu.begin()
-=======
-      // TODO
-      // These settings are used by the imu class. Only directly setting the registers as in
-      // setup_IMU_Tap_detection doesn't also schange the settings struct.
-      // While IMU.begin does copy the settings struct
-      imu.settings.accelRange      = 8;     // ±8 g: no clipping on shakes
-      imu.settings.accelSampleRate = 416;
-      imu.settings.accelBandWidth  = 400;   // keeps your current 400 Hz analog BW
-      // TODO
->>>>>>> 5cac799 (Small changes in readIMU and IMU setup. Mostly fixes and further dev testing. The old code was less correct than initially expected)
 
       Serial.println("[INFO] Booting... Qbead on XIAO BLE Sense + LSM6DS3 compiled on " __DATE__ " at " __TIME__);
       if (!imu.begin())
