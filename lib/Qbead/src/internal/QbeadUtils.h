@@ -19,8 +19,6 @@ namespace Qbead
 #define QB_SY 1
 #define QB_SZ 1
 #define INNER_STATE_COUNT 6
-#define CYCLING_TIME 600
-static constexpr uint32_t ENTANGLE_WINDOW_MS = 100;
 
 // LSM6DS3 filter settings
 #define LSM6DS3_ACC_GYRO_LPF2_XL_EN 0x80
@@ -28,6 +26,8 @@ static constexpr uint32_t ENTANGLE_WINDOW_MS = 100;
 #define LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_100 0x20
 #define LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_9 0x40
 #define LSM6DS3_ACC_GYRO_LPF2_XL_CUT_ODR_BY_400 0x60
+    static constexpr uint32_t CYCLING_TIME = 600;
+    static constexpr uint32_t ENTANGLE_WINDOW_MS = 100;
 
 #define QB_MAX_PRPH_CONNECTION 2
 
