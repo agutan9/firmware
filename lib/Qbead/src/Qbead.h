@@ -417,6 +417,16 @@ namespace Qbead
       return packet;
     }
 
+    BLEManager::DataPacket takeLatestPacket()
+    {
+      BLEManager::DataPacket packet;
+      if (!ble.takePacket(packet))
+      {
+        return {BLEManager::CommandType::None, 0, 0, 0};
+      }
+      return packet;
+    }
+
     static void tap_isr()
     {
       // This function is called when the IMU triggers an interrupt. That is: when a tap is detected!
