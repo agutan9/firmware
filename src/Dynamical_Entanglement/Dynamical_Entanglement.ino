@@ -91,7 +91,7 @@ void loop()
     // - a matched pair of requests.
     //
     // It returns true exactly once per successful match.
-    if (qbead.entangle(ENTANGLED_STATE))
+    if (qbead.entangle(qbead.wasTapped(), ENTANGLED_STATE))
     {
         Serial.println("[SUCCESS] Entanglement handshake completed.");
         entangledDisplayActive = true;

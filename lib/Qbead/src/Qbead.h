@@ -171,12 +171,6 @@ namespace Qbead
       // postConfigIMU_ShakeDetection: Shake is software based.
       // Only relevant registers are the LPF's due to high-freq acc attenuation
 
-      // TODO
-      uint8_t id;
-      imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
-      Serial.println(id, HEX);
-      // TODO
-
       ble.beginDualRole();
     }
 
@@ -334,6 +328,17 @@ namespace Qbead
       return wasTapped;
     }
 
+    bool wasShaken()
+    {
+      if (!shaken)
+        return false;
+      shaken = false;
+      x_whenshaken = whenshaken_buffer[0];
+      y_whenshaken = whenshaken_buffer[1];
+      z_whenshaken = whenshaken_buffer[2];
+      return true;
+    }
+
     // localTrigger indicates the gesture for firing a local entanglement attempt
     bool entangle(bool localTrigger, uint32_t state)
     {
@@ -388,16 +393,6 @@ namespace Qbead
       return false;
     }
 
-    bool wasShaken()
-    {
-      if (!shaken)
-        return false;
-      shaken = false;
-      x_whenshaken = whenshaken_buffer[0];
-      y_whenshaken = whenshaken_buffer[1];
-      z_whenshaken = whenshaken_buffer[2];
-      return true;
-    }
 
     BLEManager::DataPacket takeLatestPacket()
     {

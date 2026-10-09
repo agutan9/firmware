@@ -1,10 +1,10 @@
-// # Tap to Measure
-//
-
+// # Shake to Measure
 // First, let's include the Qbead library and set up a few useful data structures.
 #include <internal/BlochVector.h>
 #include <internal/QbeadUtils.h>
 #include <Qbead.h>
+
+using namespace Qbead;
 
 Qbead::Qbead bead;
 
@@ -15,7 +15,6 @@ uint32_t white = color(255, 255, 255);
 uint32_t red = color(255, 0, 0);
 uint32_t blue = color(0, 0, 255);
 
-using namespace Qbead;
 // ## Setup
 //
 // The setup function is called once when the Qbead is powered on and it is used to initialize the Qbead and set up the game.
