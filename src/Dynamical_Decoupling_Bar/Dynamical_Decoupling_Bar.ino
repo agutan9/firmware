@@ -14,10 +14,12 @@
 // First, let's include the Qbead library and set up a few useful data structures.
 #include <Qbead.h>
 
+using namespace Qbead;
+
 Qbead::Qbead bead;
 
 // The zero axis is the fixed axis around which decoherence rotates.
-Qbead::BlochVector zero_axis(0, 0);
+BlochVector zero_axis(0, 0);
 
 // Track the spread of the quantum state ensemble.
 float spread = 0;
@@ -26,8 +28,8 @@ float spread = 0;
 const int bar_section = 3;
 
 // Prepare some colors for the visualization during the game.
-uint32_t purple = Qbead::color(255, 0, 255);
-uint32_t white = Qbead::color(255, 255, 255);
+uint32_t purple = color(255, 0, 255);
+uint32_t white = color(255, 255, 255);
 
 // ## Setup
 //
@@ -39,12 +41,14 @@ void setup() {
   bead.testPixels();
 }
 
+// TODO: Crashes after some time for unkown reason
 // ## Event loop
 //
 // The loop function is called repeatedly until the Qbead is powered off.
 // It is used to read the IMU and update the spread of the ensemble.
 void loop() {
   static bool bar_visible = true;
+  static uint32_t lastprintMs = 0;
 
   // Read the IMU to get the current gravity direction.
   bead.readIMU(false);
@@ -65,7 +69,7 @@ void loop() {
     }
     // Partially light the outermost LEDs based on the fractional part of spread.
     if (spread_int < QB_NLEGS / 2) {
-      uint32_t edge_color = Qbead::scaleColorQuad(spread_frac, purple);
+      uint32_t edge_color = scaleColorQuad(spread_frac, purple);
       bead.setLegPixelColor(spread_int + 1, bar_section, edge_color);
       bead.setLegPixelColor(-(spread_int + 1), bar_section, edge_color);
     }
@@ -78,7 +82,7 @@ void loop() {
   //
   // The spread increases based on the inner product between the zero axis and gravity.
   // This represents how the ensemble of quantum states would spread out over time.
-  float spread_rate = 0.004 * innerProductGeom(zero_axis, Qbead::BlochVector(bead.x, bead.y, bead.z));
+  float spread_rate = 0.004 * innerProductGeom(zero_axis, BlochVector(bead.x, bead.y, bead.z));
   spread += spread_rate;
 
   // Keep spread within bounds of plus-or-minus half the number of legs.
@@ -89,17 +93,25 @@ void loop() {
   //
   // If the user taps the Qbead, toggle the visibility and reset the spread.
   if (bead.wasTapped()) {
-    Serial.println("TAP");
+    if (bar_visible){
+      Serial.println("[INFO]{TAP} User tap: Setting bar to be invisible!");
+    }
+    else{
+      Serial.println("[INFO]{TAP} User tap: Setting bar to be visible!");
+    }
     bar_visible = !bar_visible;
   }
 
   bar_visible = bar_visible || (millis() < 5000);
 
-  Serial.print(millis());
-  Serial.print("  | Visible: ");
-  Serial.print(bar_visible);
-  Serial.print(" | Spread: ");
-  Serial.print(spread);
-  Serial.print(" | Rate: ");
-  Serial.println(spread_rate);
+  if (millis() - lastprintMs > 250){
+    Serial.print(millis());
+    Serial.print("  | Visible: ");
+    Serial.print(bar_visible);
+    Serial.print(" | Spread: ");
+    Serial.print(spread);
+    Serial.print(" | Rate: ");
+    Serial.println(spread_rate);
+    lastprintMs = millis();
+  }
 }
