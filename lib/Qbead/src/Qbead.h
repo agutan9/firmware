@@ -69,16 +69,6 @@ namespace Qbead
     float x = 0.f, y = 0.f, z = 0.f;
     float rx = 0.f, ry = 0.f, rz = 0.f;
     uint32_t T_imu = 0;
-    float whentapped_buffer[3];
-    float x_whentapped, y_whentapped, z_whentapped; // set when wasTapped is called
-    float x, y, z, rx, ry, rz;                      // filtered and raw acc, in units of g
-    float t_acc, p_acc;             // TODO: why put these here? is this comment even correct?? ->     // theta and phi according to gravity
-    volatile bool tapped = false;
-    volatile bool tappedrecorded = false;
-    bool shaken = false;
-    float x = 0.f, y = 0.f, z = 0.f;
-    float rx = 0.f, ry = 0.f, rz = 0.f;
-    uint32_t T_imu = 0;
 
     uint32_t stateColours[INNER_STATE_COUNT] = {
         color(0, 0, 255),   // Blue
@@ -92,28 +82,12 @@ namespace Qbead
     uint32_t lastChange = 0;
     uint32_t accelSmoothingTimeUs = 100000; // Accelerometer smoothing, set to 0 to disable
     bool hasAccelSample = false;
-
 
     bool localEntangleRequestPending = false;
     uint32_t localEntangleRequestStartedAtMs = 0;
     bool remoteEntangleRequestPending = false;
     uint32_t remoteEntangleRequestReceivedAtMs = 0;
 
-    uint32_t stateColours[INNER_STATE_COUNT] = {
-        color(0, 0, 255),   // Blue
-        color(255, 0, 0),   // Red
-        color(0, 255, 0),   // Green
-        color(255, 255, 0), // Yellow
-        color(255, 0, 255), // Magenta
-        color(255, 128, 0)  // Orange
-    };
-    uint32_t cyclingIndex = 0;
-    uint32_t lastChange = 0;
-    uint32_t accelSmoothingTimeUs = 100000; // Accelerometer smoothing, set to 0 to disable
-    bool hasAccelSample = false;
-
-
-  
     // FUTURE: PR TODO
     // In order to actually be able to set gyroOn to false readIMU needs refactoring
     // to not use gravityTracker and let shakeDetector use its internal acc only method
@@ -194,16 +168,12 @@ namespace Qbead
 
       postConfigIMU_Filters();
       postConfigIMU_TapDetection();
-      // postConfigIMU_ShakeDetection: Shake is software based. 
+      // postConfigIMU_ShakeDetection: Shake is software based.
       // Only relevant registers are the LPF's due to high-freq acc attenuation
 
       // TODO
-      uint8_t id; imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
-      Serial.println(id, HEX);
-      // TODO
-
-      // TODO
-      uint8_t id; imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
+      uint8_t id;
+      imu.readRegister(&id, LSM6DS3_ACC_GYRO_WHO_AM_I_REG);
       Serial.println(id, HEX);
       // TODO
 
@@ -416,6 +386,8 @@ namespace Qbead
       }
 
       return false;
+    }
+
     bool wasShaken()
     {
       if (!shaken)
@@ -425,37 +397,6 @@ namespace Qbead
       y_whenshaken = whenshaken_buffer[1];
       z_whenshaken = whenshaken_buffer[2];
       return true;
-    }
-
-    BLEManager::DataPacket takeLatestPacket()
-    {
-      BLEManager::DataPacket packet;
-      if (!ble.takePacket(packet))
-      {
-        return {BLEManager::CommandType::None, 0, 0, 0};
-      }
-      return packet;
-    }
-    
-    bool wasShaken()
-    {
-      if (!shaken)
-        return false;
-      shaken = false;
-      x_whenshaken = whenshaken_buffer[0];
-      y_whenshaken = whenshaken_buffer[1];
-      z_whenshaken = whenshaken_buffer[2];
-      return true;
-    }
-
-    BLEManager::DataPacket takeLatestPacket()
-    {
-      BLEManager::DataPacket packet;
-      if (!ble.takePacket(packet))
-      {
-        return {BLEManager::CommandType::None, 0, 0, 0};
-      }
-      return packet;
     }
 
     BLEManager::DataPacket takeLatestPacket()
@@ -557,6 +498,9 @@ namespace Qbead
       theta_accvec = theta(x, y, z) * RAD_TO_DEG;
       phi_accvec = phi(x, y) * RAD_TO_DEG;
 
+      if (phi_accvec < 0.f)
+        phi_accvec += 360.f;
+
       if (!tappedrecorded && tapped)
       {
         tappedrecorded = true;
@@ -644,6 +588,7 @@ namespace Qbead
     void clearStates()
     {
       innerStateCount = 0;
+      cyclingIndex = 0;
     }
 
     bool applyPreparedState(uint32_t state)

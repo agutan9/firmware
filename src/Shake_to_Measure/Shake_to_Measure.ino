@@ -6,8 +6,6 @@
 #include <internal/QbeadUtils.h>
 #include <Qbead.h>
 
-using namespace Qbead;
-
 Qbead::Qbead bead;
 
 BlochVector current_state(90, 0);
@@ -17,10 +15,12 @@ uint32_t white = color(255, 255, 255);
 uint32_t red = color(255, 0, 0);
 uint32_t blue = color(0, 0, 255);
 
+using namespace Qbead;
 // ## Setup
 //
 // The setup function is called once when the Qbead is powered on and it is used to initialize the Qbead and set up the game.
-void setup() {
+void setup()
+{
   bead.begin();
   bead.setBrightness(25);
   // Test the pixels by flashing a colorful pattern to make sure they are working.
@@ -30,14 +30,16 @@ void setup() {
 // TODO: Maybe rewrite this to be more in line with how Barna add Serials etc to his
 // sketches? I of course copied this from TapToMeasure.
 // Combine the two? Have one gesture be the default one?
-void loop() {
+void loop()
+{
   static long last_event = 0;
   static uint32_t event_color = white;
 
   bead.clear();
-  bead.readIMU(false);          // must run every loop: it feeds the gravity tracker and shake detector
+  bead.readIMU(false); // must run every loop: it feeds the gravity tracker and shake detector
 
-  if (bead.wasShaken()) {
+  if (bead.wasShaken())
+  {
     last_event = millis();
     BlochVector acc_vector(bead.x_whenshaken, bead.y_whenshaken, bead.z_whenshaken);
 
@@ -48,17 +50,24 @@ void loop() {
     Serial.println(probability);
     Serial.print("threshold: ");
     Serial.println(threshold);
-    if (probability > identity_threshold) {
+    if (probability > identity_threshold)
+    {
       event_color = red;
       Serial.println("red identity");
-    } else if (probability < 1 - identity_threshold) {
+    }
+    else if (probability < 1 - identity_threshold)
+    {
       event_color = blue;
       Serial.println("blue identity");
-    } else if (probability > threshold) {
+    }
+    else if (probability > threshold)
+    {
       current_state = acc_vector;
       event_color = red;
       Serial.println("red random");
-    } else {
+    }
+    else
+    {
       current_state = -acc_vector;
       event_color = blue;
       Serial.println("blue random");
