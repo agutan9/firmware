@@ -1,6 +1,6 @@
 #include <Arduino.h>
-#include "Qbead.h"
-#include "internal/QbeadUtils.h"
+#include <Qbead.h>
+#include <internal/QbeadUtils.h>
 
 Qbead::Qbead qbead;
 

@@ -16,17 +16,19 @@
 // First, let's include the Qbead library and set up a few useful data structures.
 #include <Qbead.h>
 
+using namespace Qbead;
+
 Qbead::Qbead bead;
 
-Qbead::BlochVector current_state(90, 0);
-Qbead::BlochVector target_state(90, 0);
+BlochVector current_state(90, 0);
+BlochVector target_state(90, 0);
 
 // The zero axis is the fixed axis around which decoherence rotates.
-Qbead::BlochVector zero_axis(0, 0);
+BlochVector zero_axis(0, 0);
 
 // Prepare some colors for the visualization during the game.
-uint32_t purple = Qbead::color(255, 0, 255);
-uint32_t white = Qbead::color(255, 255, 255);
+uint32_t purple = color(255, 0, 255);
+uint32_t white = color(255, 255, 255);
 
 // ## Setup
 //
@@ -44,6 +46,7 @@ void setup() {
 // It is used to read the IMU and update the current state of the game.
 void loop() {
   static bool current_state_visible = true;
+  static uint32_t lastprintMs = 0;
 
   // Read the IMU to get the current gravity direction.
   bead.readIMU(false);
@@ -77,17 +80,25 @@ void loop() {
   // If the user taps the Qbead, toggle the visibility of the current state
   // and reset the current state to the target state.
   if (bead.wasTapped()) {
-    Serial.println("TAP");
+      if (current_state_visible){
+      Serial.println("[INFO]{TAP} User tap: Setting current state to be invisible!");
+    }
+    else{
+      Serial.println("[INFO]{TAP} User tap: Setting current state to be visible!");
+    }
     current_state_visible = !current_state_visible;
   }
 
   current_state_visible = current_state_visible || (millis() < 5000);
 
-  Serial.print(millis());
-  Serial.print("  | Visible: ");
-  Serial.print(current_state_visible);
-  Serial.print(" | Angle: ");
-  Serial.print(current_state.phi);
-  Serial.print(" | Speed: ");
-  Serial.println(rotation_speed);
+  if (millis() - lastprintMs > 250){
+    Serial.print(millis());
+    Serial.print("  | Visible: ");
+    Serial.print(current_state_visible);
+    Serial.print(" | Angle: ");
+    Serial.print(current_state.phi);
+    Serial.print(" | Speed: ");
+    Serial.println(rotation_speed);
+    lastprintMs = millis();
+  }
 }
