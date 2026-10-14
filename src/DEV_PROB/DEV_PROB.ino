@@ -28,25 +28,13 @@ constexpr uint32_t N_TOTAL = 2000;
 constexpr uint8_t  BATCH   = 20;          // rounds per loop pass
 uint32_t rounds = 0, qWins = 0, cWins = 0;
 
-// TODO: If adding this to utils use inline so the seeding stays consistant across mutliple files.
-// Problem, that is c++17 compile?
-// Alternative:
-// inline uint32_t& rngState() {
-//  static uint32_t s = 0x9E3779B9u;   // one instance, shared program-wide
-//  return s;
-//}
-//inline uint32_t rng() {
-//  uint32_t& x = rngState();
-//  x ^= x << 13; x ^= x >> 17; x ^= x << 5;
-//  return x;
-//}
+// adding to Utils.h make these static
 //inline void seedRng(uint32_t s) { rngState() = s ? s : 0x9E3779B9u; }
-uint32_t rngState = 0x9E3779B9u;           // fixed seed = demo mode
+static uint32_t rngState = 0x9E3779B9u;           // fixed seed = demo mode
 
 float qE[2][2];  // quantum correlations (debug, method B)
 float qP[2][2];  // quantum win probability per (x,y)
 float qLimit;    // long-run quantum win rate
-
 
 // Diagonal of T, differs per Bell state
 struct CorrelationDiag { float x_corr, y_corr, z_corr; };

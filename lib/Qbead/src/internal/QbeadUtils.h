@@ -4,6 +4,7 @@
 #include <math.h>
 #include <Arduino.h>
 
+// TODO: FUTURE be consistent with static style
 namespace Qbead
 {
 // default configs
@@ -304,6 +305,18 @@ namespace Qbead
         normalise(perpendicular);
         return perpendicular;
     }
+    // TODO: Properly implement this and remove from sketch
+    //static uint32_t rngState = 0x9E3779B9u;      // fixed seed = demo mode
+//
+    //static uint32_t rng()
+    //{
+    //    rngState ^= rngState << 13;
+    //    rngState ^= rngState >> 17;
+    //    rngState ^= rngState << 5;
+    //    return rngState;
+    //}
+//
+    //static void seedRng(uint32_t s) { rngState = s ? s : 0x9E3779B9u; }
 }
 
 #endif
