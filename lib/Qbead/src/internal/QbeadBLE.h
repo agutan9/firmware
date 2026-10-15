@@ -15,6 +15,13 @@ namespace BLEManager
     PreparedVisualizations = 4,
     Entangle = 5,
     Measure = 6,
+    ChshAddressLow = 7,
+    ChshAddressHigh = 8,
+    ChshRoleReady = 9,
+    ChshAxisLocked = 10,
+    ChshFirstSetting = 11,
+    ChshResult = 12,
+    ChshResultAck = 13,
   };
 
   struct DataPacket
