@@ -461,7 +461,7 @@ namespace ChshComms
     {
         const uint32_t now = millis();
 
-        if ((uint32_t)(now - lastSendMs) < RESEND_MS)
+        if ((uint32_t)(now - ChshStage::lastSendMs) < RESEND_MS)
             return;
 
         if (stage == ChshStage::Stage::Choosing)
@@ -479,7 +479,7 @@ namespace ChshComms
                     firstAxis,
                     bead);
 
-                lastSendMs = now;
+                ChshStage::lastSendMs = now;
             }
             else if (BEAD_ID == 1 && localLocked)
             {
@@ -496,7 +496,7 @@ namespace ChshComms
                 resultMessage,
                 bead);
 
-            lastSendMs = now;
+            ChshStage::lastSendMs = now;
         }
     }
 }

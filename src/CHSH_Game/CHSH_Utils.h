@@ -51,12 +51,12 @@ namespace ChshUtils
         flash.startedAtMs = millis();
 
         // Choose whichever colors you prefer.
-        // Input 0 -> cyan
-        // Input 1 -> orange
+        // Input 0 -> blue
+        // Input 1 -> red
         flash.pixelColor =
             input == 0
-                ? Qbead::color(0, 100, 100)
-                : Qbead::color(150, 50, 0);
+                ? Qbead::color(0, 0, 100)
+                : Qbead::color(100, 0, 0);
     }
 
     // Returns true while the flash owns the display.
@@ -67,7 +67,7 @@ namespace ChshUtils
         if (!flash.active)
             return false;
 
-        constexpr uint32_t flashDurationMs = 300;
+        constexpr uint32_t flashDurationMs = 500;
 
         if (
             (uint32_t)(millis() - flash.startedAtMs) >= flashDurationMs)
@@ -88,6 +88,57 @@ namespace ChshUtils
         bead.show();
 
         return true;
+    }
+
+    // Add an axis marker to the existing LED frame.
+    // Uses the same pixel selection as Qbead::setBloch_deg().
+    inline void addAxisOn(
+        Qbead::Qbead &bead,
+        const Qbead::Axis &axis,
+        uint32_t pixelColor)
+    {
+        float thetaDeg;
+        float phiDeg;
+
+        Qbead::axisAngles(
+            axis,
+            thetaDeg,
+            phiDeg);
+
+        const float thetaSection =
+            thetaDeg / bead.theta_quant;
+
+        int leg;
+        int section;
+
+        if (thetaSection < 0.5f)
+        {
+            leg = 0;
+            section = 0;
+        }
+        else if (thetaSection > bead.nsections - 0.5f)
+        {
+            leg = 0;
+            section = bead.nsections;
+        }
+        else
+        {
+            section = (int)roundf(thetaSection);
+
+            if (section > bead.nsections - 1)
+                section = bead.nsections - 1;
+
+            leg = (int)roundf(
+                phiDeg / bead.phi_quant);
+
+            leg %= bead.nlegs;
+        }
+
+        // Add to the current pixel instead of replacing its color.
+        bead.addLegPixelColor(
+            leg,
+            section,
+            pixelColor);
     }
     // -------------------------------------------------------------------------
     // Live measurement axis
@@ -148,54 +199,31 @@ namespace ChshUtils
         bead.clear();
 
         // Static visualization of the prepared entangled state.
-        for (uint8_t i = 0; i < bead.innerStateCount; ++i)
-        {
-            bead.setBloch_deg(
-                bead.innerStates[i],
-                bead.stateColours[i]);
-        }
+        bead.displayCurrentStatesStatic();
 
         if (localLocked)
         {
-            // Locked measurement axis.
-            ChshUtils::drawAxisOn(
-                bead,
-                Qbead::oppositeAxis(localAxis),
-                Qbead::color(0, 0, 15));
-
             ChshUtils::drawAxisOn(
                 bead,
                 localAxis,
-                Qbead::color(0, 0, 150));
+                Qbead::color(210,207,2));
         }
         else
         {
             const Qbead::Axis live =
                 ChshUtils::previewAxisFor(bead);
 
-            // White: current selectable measurement axis.
-            ChshUtils::drawAxisOn(
-                bead,
-                Qbead::oppositeAxis(live),
-                Qbead::color(10, 10, 10));
-
-            ChshUtils::drawAxisOn(
+            ChshUtils::addAxisOn(
                 bead,
                 live,
-                Qbead::color(90, 90, 90));
+                Qbead::color(70, 70, 70));
 
-            // Green: suggested axis for the second bead.
             if (targetAvailable)
             {
-                ChshUtils::drawAxisOn(
-                    bead,
-                    Qbead::oppositeAxis(targetAxis),
-                    Qbead::color(0, 15, 0));
-
-                ChshUtils::drawAxisOn(
+                ChshUtils::addAxisOn(
                     bead,
                     targetAxis,
-                    Qbead::color(0, 150, 0));
+                    Qbead::color(0, 120, 0));
             }
         }
 
@@ -495,7 +523,7 @@ namespace ChshUtils
             axis,
             bead);
 
-        lastSendMs = millis();
+        ChshStage::lastSendMs = millis();
     }
 
     // -----------------------------------------------------------------------------
@@ -515,7 +543,7 @@ namespace ChshUtils
             localAxis,
             bead);
 
-        lastSendMs = millis();
+        ChshStage::lastSendMs = millis();
     }
 
     void lockLocalAxis(Qbead::Qbead &bead)
