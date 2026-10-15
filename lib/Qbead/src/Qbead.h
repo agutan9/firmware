@@ -395,7 +395,6 @@ namespace Qbead
       return false;
     }
 
-
     BLEManager::DataPacket takeLatestPacket()
     {
       BLEManager::DataPacket packet;
@@ -640,6 +639,11 @@ namespace Qbead
       this->setBloch_deg(innerStates[cyclingIndex], stateColours[cyclingIndex]);
       this->show();
       cyclingIndex = (cyclingIndex + 1) % (innerStateCount);
+    }
+
+    void getBluetoothAddres(uint8_t localAddress[6])
+    {
+      ble.getAddr(localAddress);
     }
   }; // end class
 

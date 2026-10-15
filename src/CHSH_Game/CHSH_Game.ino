@@ -38,7 +38,7 @@ void startRound()
     stage = ChshStage::Stage::Choosing;
 
     lastGestureMs = millis();
-    lastSendMs = millis();
+    ChshStage::lastSendMs = millis();
 
     Serial.println("[ROUND] New guided round.");
 
@@ -104,7 +104,7 @@ void measureBothIfReady()
         resultMessage,
         bead);
 
-    lastSendMs = millis();
+    ChshStage::lastSendMs = millis();
 
     ChshUtils::recordResult(
         x,
@@ -133,7 +133,7 @@ void setup()
     bead.clearStates();
     ChshUtils::showIdle(bead);
 
-    Bluefruit.getAddr(localAddress);
+    bead.getBluetoothAddres(localAddress);
 
     Serial.print("[BOOT] Local Bluetooth address: ");
     ChshComms::printAddress(localAddress);
