@@ -197,20 +197,23 @@ namespace Qbead
 
     int computePixelIndex(int leg, int pixel)
     {
-        leg = QB_NLEGS - leg; // invert direction for the phi angle, because the PCB is set up as a left-handed coordinate system
-        leg = leg % QB_NLEGS;
-        if (leg == 0)
-        {
-            return pixel;
-        }
-        else if (pixel == 0 || pixel == QB_NSECTIONS)
-        {
-            return pixel;
-        }
-        return (QB_NSECTIONS + 1) + (leg - 1) * (QB_NSECTIONS - 1) + pixel - 1;
-    }
+        if (QB_NLEGS == 0 || pixel < 0 || pixel > QB_NSECTIONS)
+            return -1;
 
-    // Inside QbeadUtils.h, within namespace Qbead.
+        leg = ((leg % QB_NLEGS) + QB_NLEGS) % QB_NLEGS;
+        leg = (QB_NLEGS - leg) % QB_NLEGS;
+
+        if (pixel == 0)
+            return QB_NSECTIONS;
+
+        if (pixel == QB_NSECTIONS)
+            return 0;
+
+        if (leg == 0)
+            return QB_NSECTIONS - pixel;
+
+        return (QB_NSECTIONS + 1) + (leg - 1) * (QB_NSECTIONS - 1) + (pixel - 1);
+    }
 
     struct Axis
     {

@@ -106,6 +106,11 @@ namespace BLEManager
     BLEClientCharacteristic qBeadColCharClient;
     BLECharacteristic qBeadColCharChar;
 
+    void getAddr(uint8_t localAddress[6])
+    {
+      Bluefruit.getAddr(localAddress);
+    }
+
     bool takePacket(DataPacket &packet)
     {
       if (lastPacket.type == CommandType::None)
