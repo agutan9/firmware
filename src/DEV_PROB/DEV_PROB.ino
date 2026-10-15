@@ -27,10 +27,11 @@ Qbead::Qbead bead;
 constexpr uint32_t N_TOTAL = 2000;
 constexpr uint8_t  BATCH   = 20;          // rounds per loop pass
 uint32_t rounds = 0, qWins = 0, cWins = 0;
-
 // adding to Utils.h make these static
 //inline void seedRng(uint32_t s) { rngState() = s ? s : 0x9E3779B9u; }
-static uint32_t rngState = 0x9E3779B9u;           // fixed seed = demo mode
+uint32_t rngState = 0x9E3779B9u;           // fixed seed = demo mode
+
+bool running = 0;
 
 float qE[2][2];  // quantum correlations (debug, method B)
 float qP[2][2];  // quantum win probability per (x,y)
@@ -47,7 +48,9 @@ const CorrelationDiag PHI_PLUS{1,-1,1}, PHI_MINUS{-1,1,1}, PSI_PLUS{1,1,-1}, PSI
 
 static inline uint32_t rng() {
   // Marsaglia's xorshift32 -> Very long non-repeating cycle: 2^32 - 1
-  rngState ^= rngState << 13; rngState ^= rngState >> 17; rngState ^= rngState << 5;
+  rngState ^= rngState << 13; 
+  rngState ^= rngState >> 17;
+  rngState ^= rngState << 5;
   return rngState;
 }
 void seedRng(uint32_t s) { rngState = s ? s : 0x9E3779B9u; }   // xorshift must not be 0
@@ -124,6 +127,7 @@ void setup() {
   bead.testPixels();
   //
   seedRng(hwSeed());
+  running = 1;
 }
 
 // TODO: Consistent rate per s
