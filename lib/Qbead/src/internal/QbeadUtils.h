@@ -209,6 +209,98 @@ namespace Qbead
         }
         return (QB_NSECTIONS + 1) + (leg - 1) * (QB_NSECTIONS - 1) + pixel - 1;
     }
+
+    // Inside QbeadUtils.h, within namespace Qbead.
+
+    struct Axis
+    {
+        float x;
+        float y;
+        float z;
+    };
+
+    inline float clampUnit(float value)
+    {
+        if (value < -1.f)
+            return -1.f;
+
+        if (value > 1.f)
+            return 1.f;
+
+        return value;
+    }
+
+    inline bool normalise(Axis &axis)
+    {
+        const float norm = sqrtf(
+            axis.x * axis.x +
+            axis.y * axis.y +
+            axis.z * axis.z);
+
+        if (!isfinite(norm) || norm < 1e-6f)
+            return false;
+
+        axis.x /= norm;
+        axis.y /= norm;
+        axis.z /= norm;
+
+        return true;
+    }
+
+    inline Axis oppositeAxis(const Axis &axis)
+    {
+        return {-axis.x, -axis.y, -axis.z};
+    }
+
+    inline float dotProduct(const Axis &a, const Axis &b)
+    {
+        return a.x * b.x +
+               a.y * b.y +
+               a.z * b.z;
+    }
+
+    inline void axisAngles(
+        const Axis &axis,
+        float &thetaDeg,
+        float &phiDeg)
+    {
+        thetaDeg = acosf(clampUnit(axis.z)) * RAD_TO_DEG;
+        phiDeg = atan2f(axis.y, axis.x) * RAD_TO_DEG;
+
+        if (phiDeg < 0.f)
+            phiDeg += 360.f;
+    }
+
+    inline Axis axisFromDegrees(float thetaDeg, float phiDeg)
+    {
+        const float t = thetaDeg * DEG_TO_RAD;
+        const float p = phiDeg * DEG_TO_RAD;
+        const float s = sinf(t);
+
+        return {
+            s * cosf(p),
+            s * sinf(p),
+            cosf(t)};
+    }
+
+    inline Axis perpendicularTo(const Axis &axis)
+    {
+        // Expects a normalized axis.
+        Axis reference = {1.f, 0.f, 0.f};
+
+        if (fabsf(axis.x) > 0.9f)
+            reference = {0.f, 0.f, 1.f};
+
+        const float projection = dotProduct(reference, axis);
+
+        Axis perpendicular = {
+            reference.x - projection * axis.x,
+            reference.y - projection * axis.y,
+            reference.z - projection * axis.z};
+
+        normalise(perpendicular);
+        return perpendicular;
+    }
 }
 
 #endif
