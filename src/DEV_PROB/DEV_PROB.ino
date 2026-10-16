@@ -30,7 +30,7 @@ constexpr uint8_t N_BANDS = QB_NSECTIONS + 1;  // TODO ALREADY in UTILS
 constexpr float WINS_PER_BAND = (float)N_TOTAL / N_BANDS;
 
 // Colours
-constexpr uint32_t WIN_THR_COLOUR = 0x2a4bd1; // #2a4bd1
+const uint32_t WIN_THR_COLOUR = color(255, 0, 0); // #2a4bd1
 const uint32_t FULL_BAND_COLOUR = color(0, 255, 0); // TODO REdo into proper colour maps also with HSV
 const uint32_t EMPTY_BAND_COLOUR = color(0, 0, 255); // Also so I have 4 different onces 
 
@@ -154,9 +154,14 @@ void setBandColour(uint8_t band_index, uint32_t newColour, bool crossFade = fals
 // t = band fill level: 0 = red (empty), 0.5 = black, 1 = green (full)
 static uint32_t fillColorMap(float t)
 {
-  t = constrain(t, 0.f, 1.f);
-  if (t < 0.5f) return scaleColor(1.f - 2.f * t, EMPTY_BAND_COLOUR);
-  return scaleColor(2.f * t - 1.f, FULL_BAND_COLOUR);
+  t = constrain(t, 0.f, 1.f); // TODO?
+  if (t < 0.5f){
+     currentFillColour = scaleColor(1.f - 2.f * t, EMPTY_BAND_COLOUR);
+  }
+  else {
+    currentFillColour  = scaleColor(2.f * t - 1.f, FULL_BAND_COLOUR);
+  }
+  return currentFillColour;
 }
 
 
@@ -176,12 +181,24 @@ void showLiquidFill(uint32_t wins)
 //void showLiquidFill(float qFrac, float cFrac){
 //  return;
 //};
+uint32_t fadeStartTime = 0;
+constexpr uint32_t fadeInterval = 10000; 
 
 void showThresholdBand(){
-  //setBandColour();
+  static uint32_t fadeNow = millis() - fadeStartTime;
+  uint8_t phase = (uint8_t)((fadeNow * 255UL) / fadeInterval);
+  // Want to start at 1.0 (sin8 starts at 0.5) so need to phase shift to a cosine
+  luxLevel = Adafruit_NeoPixel::sine8(phase + 64) / 255.0f;
+  // Set the 5th band: 0.75 * 7 = 5.25 -> 5
+  setBandColour(4, WIN_THR_COLOUR, true, )
   // TODO later
-  return;
 }
+////        uint32_t fadeNow = now - fadeStartTime;
+//        uint32_t halfInterval = fadeInterval / 2;
+//        // fadeNow is implicitly % fadeInterval here
+//        uint8_t phase = (uint8_t)((fadeNow * 255UL) / fadeInterval);
+//        // Want to start at 1.0 (sin8 starts at 0.5) so need to phase shift to a cosine
+//        luxLevel = Adafruit_NeoPixel::sine8(phase + 64) / 255.0f;
 
 
  // setup(): seedRng(hwSeed());       demo mode: seedRng(0x9E3779B9u);
