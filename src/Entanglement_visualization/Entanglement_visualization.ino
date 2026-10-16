@@ -292,18 +292,19 @@ void initPixelLUT(const Qbead::Qbead &bead)
 
     const int pixelsPerLeg = bead.nsections - 1;
     // First physical leg: pixel order runs from south toward north
-    for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
-    {
-        const float theta =
-            180.0f - thetaIndex * bead.theta_quant;
-
-        pixelLUT[thetaIndex] = {
-            Qbead::sin_deg(theta),
-            0.0f,
-            Qbead::cos_deg(theta)};
-    }
+    //for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
+    //{
+    //    const float theta =
+    //        180.0f - thetaIndex * bead.theta_quant;
+//
+    //    pixelLUT[thetaIndex] = {
+    //        Qbead::sin_deg(theta),
+    //        0.0f,
+    //        Qbead::cos_deg(theta)};
+    //}
     // Remaining physical legs: theta runs from north toward south
-    for (int phiIndex = 1; phiIndex < bead.nlegs; phiIndex++)
+    //for (int phiIndex = 1; phiIndex < bead.nlegs; phiIndex++)
+    for (int phiIndex = 0; phiIndex < bead.nlegs; phiIndex++)
     {
         const float phi = phiIndex * bead.phi_quant;
 

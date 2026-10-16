@@ -10,6 +10,7 @@
 #include "internal/BlochVector.h"
 #include "internal/QbeadUtils.h"
 #include "internal/QbeadBLE.h"
+#include "internal/QbeadPixels.h"
 #include "internal/ShakeDetector.h"
 #include "internal/GravityTracker.h"
 
@@ -30,7 +31,8 @@ namespace Qbead
           const bool sy = QB_SY,
           const bool sz = QB_SZ)
         : imu(LSM6DS3(I2C_MODE, imu_addr)),
-          pixels(Adafruit_NeoPixel(nlegs * (nsections - 1) + 2, pin00, pixelconfig)),
+          //pixels(Adafruit_NeoPixel(nlegs * (nsections - 1) + 2, pin00, pixelconfig)),
+          pixels(QbeadIndexed_NeoPixelStrip(nlegs * (nsections - 1) + 2, pin00, pixelconfig)),
           nsections(nsections),
           nlegs(nlegs),
           theta_quant(180 / nsections),
@@ -45,7 +47,8 @@ namespace Qbead
     LSM6DS3 imu;
     ShakeDetector shake;
     GravityTracker gravity;
-    Adafruit_NeoPixel pixels;
+    //Adafruit_NeoPixel pixels; // TODO
+    QbeadIndexed_NeoPixelStrip pixels;
     BLEManager::BLEManager ble;
     BlochVector innerStates[INNER_STATE_COUNT];
     uint8_t innerStateCount = 0;
@@ -294,7 +297,8 @@ namespace Qbead
       {
         pixels.setPixelColor(i, color(255, 255, 255));
         pixels.show();
-        delay(5);
+        //delay(5); TODO
+        delay(100);
       }
       Serial.println("[INFO] Testing smooth transition between pixels");
       for (int phi = 0; phi < 360; phi += 30)
