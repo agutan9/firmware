@@ -301,8 +301,7 @@ void initPixelLUT(const Qbead::Qbead &bead)
             const float sinTheta = Qbead::sin_deg(theta);
 
             const int pixelIndex =
-                thetaIndex + phiIndex * 
-                midPixelsPerLeg +
+                thetaIndex + phiIndex * midPixelsPerLeg +
                 (phiIndex > 0 ? 1 : 0);
 
             pixelLUT[pixelIndex] = {
