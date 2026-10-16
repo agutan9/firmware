@@ -287,23 +287,10 @@ void updateVisual()
 
 void initPixelLUT(const Qbead::Qbead &bead)
 {
-    pixelLUT[NORTH_POLE_IDX] = {0.0f, 0.0f, -1.0f};
-    pixelLUT[SOUTH_POLE_IDX] = {0.0f, 0.0f, 1.0f};
+    pixelLUT[NORTH_POLE_IDX] = {0.0f, 0.0f, +1.0f};
+    pixelLUT[SOUTH_POLE_IDX] = {0.0f, 0.0f, -1.0f};
 
-    const int pixelsPerLeg = bead.nsections - 1;
-    // First physical leg: pixel order runs from south toward north
-    //for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
-    //{
-    //    const float theta =
-    //        180.0f - thetaIndex * bead.theta_quant;
-//
-    //    pixelLUT[thetaIndex] = {
-    //        Qbead::sin_deg(theta),
-    //        0.0f,
-    //        Qbead::cos_deg(theta)};
-    //}
-    // Remaining physical legs: theta runs from north toward south
-    //for (int phiIndex = 1; phiIndex < bead.nlegs; phiIndex++)
+    const int midPixelsPerLeg = bead.nsections - 1;
     for (int phiIndex = 0; phiIndex < bead.nlegs; phiIndex++)
     {
         const float phi = phiIndex * bead.phi_quant;
@@ -311,13 +298,12 @@ void initPixelLUT(const Qbead::Qbead &bead)
         for (int thetaIndex = 1; thetaIndex < bead.nsections; thetaIndex++)
         {
             const float theta = thetaIndex * bead.theta_quant;
+            const float sinTheta = Qbead::sin_deg(theta);
 
             const int pixelIndex =
-                7 +
-                (phiIndex - 1) * pixelsPerLeg +
-                (thetaIndex - 1);
-
-            const float sinTheta = Qbead::sin_deg(theta);
+                thetaIndex + phiIndex * 
+                midPixelsPerLeg +
+                (phiIndex > 0 ? 1 : 0);
 
             pixelLUT[pixelIndex] = {
                 Qbead::cos_deg(phi) * sinTheta,
