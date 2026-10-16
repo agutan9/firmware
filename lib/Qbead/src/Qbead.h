@@ -47,7 +47,6 @@ namespace Qbead
     LSM6DS3 imu;
     ShakeDetector shake;
     GravityTracker gravity;
-    //Adafruit_NeoPixel pixels; // TODO
     QbeadIndexed_NeoPixelStrip pixels;
     BLEManager::BLEManager ble;
     BlochVector innerStates[INNER_STATE_COUNT];
@@ -297,8 +296,7 @@ namespace Qbead
       {
         pixels.setPixelColor(i, color(255, 255, 255));
         pixels.show();
-        //delay(5); TODO
-        delay(100);
+        delay(5);
       }
       Serial.println("[INFO] Testing smooth transition between pixels");
       for (int phi = 0; phi < 360; phi += 30)

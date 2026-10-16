@@ -1,3 +1,6 @@
+#ifndef QBEAD_SHAKE_DETECT_H
+#define QBEAD_SHAKE_DETECT_H
+
 #include <math.h>
 
 /**
@@ -290,3 +293,4 @@ struct ShakeDetector
         return false;
     }
 };
+#endif 

@@ -1,3 +1,6 @@
+#ifndef QBEAD_GRAVITY_TRACK_H
+#define QBEAD_GRAVITY_TRACK_H
+
 #include <math.h>
 #include <Arduino.h>
 
@@ -124,3 +127,4 @@ struct GravityTracker
                 gravityEstimate[i] /= norm;
     }
 };
+#endif
