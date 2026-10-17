@@ -38,9 +38,6 @@ constexpr uint32_t RUN_MS = 10000;               // total animation time
 uint32_t runStart = 0;
 
 uint32_t rounds = 0, qWins = 0, cWins = 0;
-// adding to Utils.h make these static
-//inline void seedRng(uint32_t s) { rngState() = s ? s : 0x9E3779B9u; }
-uint32_t rngState = 0x9E3779B9u;           // fixed seed = demo mode
 uint32_t currentFillColour = 0;
 
 float qE[2][2];  // quantum correlations (debug, method B)
@@ -55,28 +52,7 @@ struct Strategy { BlochVector a[2]; BlochVector b[2]; };
 
 const CorrelationDiag PHI_PLUS{1,-1,1}, PHI_MINUS{-1,1,1}, PSI_PLUS{1,1,-1}, PSI_MINUS{-1,-1,-1};
 
-static inline uint32_t rng() {
-  // Marsaglia's xorshift32 -> Very long non-repeating cycle: 2^32 - 1
-  rngState ^= rngState << 13; 
-  rngState ^= rngState >> 17;
-  rngState ^= rngState << 5;
-  return rngState;
-}
-void seedRng(uint32_t s) { rngState = s ? s : 0x9E3779B9u; }   // xorshift must not be 0
-// live mode: seedRng(<32 bits from the hardware RNG, optionally ^ micros()>);
-// The hardware RNG is much slower per byte, which is why you use it only for the seed and not as a stream
 
-uint32_t hwSeed() {
-  uint8_t sdOn = 0;
-  uint32_t s = 0;
-  if (sd_softdevice_is_enabled(&sdOn) == NRF_SUCCESS && sdOn &&
-      sd_rand_application_vector_get((uint8_t*)&s, sizeof(s)) == NRF_SUCCESS) {
-    return s ? s : 0x9E3779B9u;
-  }
-  // micros near boot will be very similar each time! beware
-  return (micros() ^ 0xA5A5A5A5u) | 1u;      // fallback, never 0
-}
-// TODO: Test. Call hwSeed() once from a sketch that never starts BLE, to confirm it falls back without resetting. Adding the header may need #include <nrf_soc.h> and <nrf_sdm.h>, depending on your core. I haven't checked this in your buil
 
 
 // Inputs: Basis alice and Basis bob
@@ -114,7 +90,7 @@ void lockIn(const CorrelationDiag& T, const Strategy& s) {    // axes must be no
 
 
 void playRound(bool &qWin, bool &cWin) {           // same (x,y) for both strategies
-  uint32_t r = rng();
+  uint32_t r = updateRNG();
   // Xorshift's lowest bits are its weakest. Take highest bits
   int x = (r >> 31) & 1, y = (r >> 30) & 1;
   // This gives a 22-bit uniform, with resolution of about 2.4×10−72.4×10−7
@@ -188,9 +164,9 @@ void showThresholdBand(){
   static uint32_t fadeNow = millis() - fadeStartTime;
   uint8_t phase = (uint8_t)((fadeNow * 255UL) / fadeInterval);
   // Want to start at 1.0 (sin8 starts at 0.5) so need to phase shift to a cosine
-  luxLevel = Adafruit_NeoPixel::sine8(phase + 64) / 255.0f;
+  //luxLevel = Adafruit_NeoPixel::sine8(phase + 64) / 255.0f;
   // Set the 5th band: 0.75 * 7 = 5.25 -> 5
-  setBandColour(4, WIN_THR_COLOUR, true, )
+  //setBandColour(4, WIN_THR_COLOUR, true, )
   // TODO later
 }
 ////        uint32_t fadeNow = now - fadeStartTime;
@@ -201,7 +177,7 @@ void showThresholdBand(){
 //        luxLevel = Adafruit_NeoPixel::sine8(phase + 64) / 255.0f;
 
 
- // setup(): seedRng(hwSeed());       demo mode: seedRng(0x9E3779B9u);
+ // setup(): seedRng(getHardwareSeed());       demo mode: seedRng(0x9E3779B9u);
 void setup() {
   bead.begin();
   bead.setBrightness(25);
@@ -209,8 +185,9 @@ void setup() {
   bead.testPixels();
   //
   lockIn(PHI_PLUS, Strategy{BlochVector(0, 0), BlochVector(90,0)});
-  //seedRng(hwSeed());
-  seedRng(1909);
+  
+  // Overrule hardware seed
+  seedRNG(1909);
 
   runStart = millis();
 }

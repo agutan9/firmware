@@ -5,6 +5,7 @@ using namespace Qbead;
 
 Qbead::Qbead bead;
 
+// TODO: Macros part of Utils.h
 #define NORTH_POLE_IDX 0
 #define SOUTH_POLE_IDX 6
 #define NUM_PIXELS 62

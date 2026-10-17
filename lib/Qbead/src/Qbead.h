@@ -31,7 +31,6 @@ namespace Qbead
           const bool sy = QB_SY,
           const bool sz = QB_SZ)
         : imu(LSM6DS3(I2C_MODE, imu_addr)),
-          //pixels(Adafruit_NeoPixel(nlegs * (nsections - 1) + 2, pin00, pixelconfig)),
           pixels(QbeadIndexed_NeoPixelStrip(nlegs * (nsections - 1) + 2, pin00, pixelconfig)),
           nsections(nsections),
           nlegs(nlegs),
@@ -58,7 +57,7 @@ namespace Qbead
     const uint8_t phi_quant;
     const uint8_t ix, iy, iz;
     const bool sx, sy, sz;
-    float rbuffer[3];
+    float read_buffer[3];
     float whentapped_buffer[3] = {0.f, 0.f, 1.f};
     float whenshaken_buffer[3] = {0.f, 0.f, 1.f};   /**< Unit shake axis (sphere frame) at the start of the last shake. */
     float gyroBiasDps[3] = {0.f, 0.f, 0.f};         /**< Learned gyro zero-rate offset (deg/s), subtracted from every reading. */
@@ -174,6 +173,9 @@ namespace Qbead
       // Only relevant registers are the LPF's due to high-freq acc attenuation
 
       ble.beginDualRole();
+
+      // BLE Softdevice needs to be initialized
+      seedRNG(getHardwareSeed());
     }
 
     void clear()
@@ -419,12 +421,12 @@ namespace Qbead
 
     void readIMU(bool print = true)
     {
-      rbuffer[0] = imu.readFloatAccelX();
-      rbuffer[1] = imu.readFloatAccelY();
-      rbuffer[2] = imu.readFloatAccelZ();
-      rx = (1 - 2 * sx) * rbuffer[ix];
-      ry = (1 - 2 * sy) * rbuffer[iy];
-      rz = (1 - 2 * sz) * rbuffer[iz];
+      read_buffer[0] = imu.readFloatAccelX();
+      read_buffer[1] = imu.readFloatAccelY();
+      read_buffer[2] = imu.readFloatAccelZ();
+      rx = (1 - 2 * sx) * read_buffer[ix];
+      ry = (1 - 2 * sy) * read_buffer[iy];
+      rz = (1 - 2 * sz) * read_buffer[iz];
       float rawmag2 = rx * rx + ry * ry + rz * rz;
 
       uint32_t T_new = micros();
@@ -544,9 +546,9 @@ namespace Qbead
         Serial.println();
       }
 
-      rbuffer[0] = x;
-      rbuffer[1] = y;
-      rbuffer[2] = z;
+      read_buffer[0] = x;
+      read_buffer[1] = y;
+      read_buffer[2] = z;
     }
 
     bool hasState(const BlochVector &state,
@@ -645,6 +647,7 @@ namespace Qbead
     {
       ble.getAddr(localAddress);
     }
+
   }; // end class
 
   Qbead *Qbead::callbackTarget = nullptr;
