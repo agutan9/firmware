@@ -127,7 +127,7 @@ namespace Qbead
             // Set the 5th band: 0.75 * 7 = 5.25 -> 5
             // TODO: Ensure that the supposed underlying colour gets shown isntead of overwritten with black
             //painter.setBandColor(THRESHOLD_BAND, scaleColor(luxLevel, SHOT_THR_COLOUR));
-            painter.setBandColor(4,
+            painter.setBandColor((uint8_t)(0.75f * nbands),
                 addColor(scaleColor(luxLevel, SHOT_THR_COLOUR),
                  scaleColor(1.f - luxLevel, underColor)));
         }

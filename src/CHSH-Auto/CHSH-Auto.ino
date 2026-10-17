@@ -30,7 +30,7 @@ static inline float corr_E(const CorrelationDiag& T, const BlochVector& a, const
      return a.x * T.x_corr * b.x + a.y * T.y_corr * b.y + a.z * T.z_corr * b.z; 
     }
 
-// TODO: Normalize first. The comment says axes must be normalized, but nothing enforces it. Normalize the four vectors before building Strategy, or add a debug assert that ∣E∣≤1∣E∣≤1
+// TODO: Normalize the four vectors before building Strategy, or add a debug assert that ∣E∣≤1∣E∣≤1
 void lockIn(const CorrelationDiag& T, const Strategy& s) {    // axes must be normalized
   float sum = 0;
   for (int x = 0; x < 2; x++) for (int y = 0; y < 2; y++) {
@@ -53,14 +53,7 @@ void playRound(bool &qWin, bool &cWin) {           // same (x,y) for both strate
   cWin = !(x & y);                       // always answer 0
 }
 
-uint32_t fadeStartTime = 0;
-
-////        uint32_t fadeNow = now - fadeStartTime;
-//        uint32_t halfInterval = fadeInterval / 2;
-//        // fadeNow is implicitly % fadeInterval here
-//        uint8_t phase = (uint8_t)((fadeNow * 255UL) / fadeInterval);
-//        // Want to start at 1.0 (sin8 starts at 0.5) so need to phase shift to a cosine
-//        luxLevel = Adafruit_NeoPixel::sine8(phase + 64) / 255.0f;
+uint32_t fadeStartTime = 0; // TODO Better
 
 void testSimulation(){
   delay(2500);  
@@ -96,13 +89,14 @@ void setup() {
  
   // Overrule hardware seed
   //seedRNG(1909);
-  bead.clear();
-  testSimulation();
+
+  //testSimulation();
 
   runStart = millis();
   fadeStartTime = millis();
 }
 
+const uint8_t THRESHOLD_BAND = (uint8_t)(0.75f * QB_NBANDS); // TODO
 bool finished = false;
 void loop() {
   constexpr bool isClassicalBead = false;// TODO: Better
@@ -120,21 +114,29 @@ void loop() {
       cWins += cWin;
       rounds++;
     }
-    Serial.printf("Current wins: %d\n", qWins);
+    //Serial.printf("Current wins: %d\n", qWins); // TODO
   }
   else{
     if (!finished){
-      Serial.printf("Wins Total: %lu\n", qWins);
-      Serial.printf("Win rate: %.2f%%\n", 100.0f * qWins / N_TOTAL);
+      Serial.printf("qWins Total: %lu\n", qWins);
+      Serial.printf("qWin rate: %.2f%%\n", 100.0f * qWins / N_TOTAL);
+      Serial.printf("cWins Total: %lu\n", cWins);
+      Serial.printf("cWin rate: %.2f%%\n", 100.0f * cWins / N_TOTAL);
       finished = !finished;
     }    
   }
-  //float qFrac = rounds ? (float)qWins / rounds : 0.f;
-  //float cFrac = rounds ? (float)cWins / rounds : 0.f;
+
   bead.clear();
-  //showLiquidFill(isClassicalBead ? cFrac : qFrac);   // each bead shows its own strategy
-  bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL);
-  bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, 4));
+  if (isClassicalBead){
+    bead.prMode.showDualLiquidFill(cWins, rounds - cWins, N_TOTAL);
+    if (!finished){
+      Serial.println("We are calling the classical display!");
+    }
+  }
+  else {
+    bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL);
+  }
+  bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
   bead.show();
 }
 
