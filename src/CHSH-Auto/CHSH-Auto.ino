@@ -118,9 +118,9 @@ void loop() {
   }
   else{
     if (!finished){
-      Serial.printf("qWins Total: %lu\n", qWins);
+      Serial.printf("qWins Total: %lu\n", (ulong)qWins);
       Serial.printf("qWin rate: %.2f%%\n", 100.0f * qWins / N_TOTAL);
-      Serial.printf("cWins Total: %lu\n", cWins);
+      Serial.printf("cWins Total: %lu\n", (ulong)cWins);
       Serial.printf("cWin rate: %.2f%%\n", 100.0f * cWins / N_TOTAL);
       finished = !finished;
     }    
@@ -129,13 +129,11 @@ void loop() {
   bead.clear();
   if (isClassicalBead){
     bead.prMode.showDualLiquidFill(cWins, rounds - cWins, N_TOTAL);
-    if (!finished){
-      Serial.println("We are calling the classical display!");
-    }
   }
   else {
     bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL);
   }
+  // Th must be after initial draw
   bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
   bead.show();
 }

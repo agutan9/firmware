@@ -42,6 +42,21 @@ namespace Qbead
             return addColor(scaleColor(a, topCol), scaleColor(b, botCol));
         }
 
+        // area fraction of the sphere below the lower edge of band b (south pole = band 0)
+        float bandEdgeArea(uint8_t b, uint8_t nsections)
+        {
+            float theta = constrain((b - 0.5f) * 180.f / nsections, 0.f, 180.f);
+            return (1.f - cos_deg(theta)) * 0.5f;
+        }
+
+        // 0..1 level of band b when a fraction p of the sphere's area is filled from the south
+        float bandLevel(float p, uint8_t b, uint8_t nsections)
+        {
+            float lo = bandEdgeArea(b, nsections);
+            float hi = bandEdgeArea(b + 1, nsections);       // clamps to 1.0 past the north pole
+            return constrain((p - lo) / (hi - lo), 0.f, 1.f);
+        }
+
         // t = band fill level: 0 = red (empty), 0.5 = black, 1 = green (full)
         uint32_t fillColorMap(float t)
         {
@@ -106,14 +121,29 @@ namespace Qbead
             //    // Only one band at a time can have fill-up gradient
             //    setBandColour(bead, nbands - fullBands - 1, fillColorMap(fillRatio - fullBands));
             //}
-            float win  = (float)botCount  / total * nbands;   // rises from the south pole
-            float loss = (float)topCount / total * nbands;   // falls from the north pole
+            //float win  = (float)botCount  / total * nbands;   // rises from the south pole
+            //float loss = (float)topCount / total * nbands;   // falls from the north pole
+            float winP = (float)botCount / total;
+            float lossP = (float)topCount / total;
+            
 
             for (uint8_t b = 0; b < nbands; b++) {
-                float w = constrain(win  - b,                0.f, 1.f);
-                float l = constrain(loss - (nbands - 1 - b), 0.f, 1.f);
-                painter.setBandColor(b, addColor(scaleColor(w, color(0, 255, 0)),
-                                                scaleColor(l, color(255, 0, 0))));
+                
+                // LINEAR
+                //float w = constrain(win  - b,                0.f, 1.f);
+                //float l = constrain(loss - (nbands - 1 - b), 0.f, 1.f);
+                
+                // AREA MAPPED
+                float w = bandLevel(winP,  b,             QB_NSECTIONS);
+                float l = bandLevel(lossP, QB_NSECTIONS - b, QB_NSECTIONS);
+                
+                // NO GAMMA
+                //painter.setBandColor(b, addColor(scaleColor(w, color(0, 255, 0)),
+                //                                scaleColor(l, color(255, 0, 0))));
+                
+                // GAMMA
+                painter.setBandColor(b, Adafruit_NeoPixel::gamma32(
+                            addColor(scaleColor(w, color(0, 255, 0)), scaleColor(l, color(255, 0, 0)))));
             }
         }
 
@@ -127,7 +157,8 @@ namespace Qbead
             // Set the 5th band: 0.75 * 7 = 5.25 -> 5
             // TODO: Ensure that the supposed underlying colour gets shown isntead of overwritten with black
             //painter.setBandColor(THRESHOLD_BAND, scaleColor(luxLevel, SHOT_THR_COLOUR));
-            painter.setBandColor((uint8_t)(0.75f * nbands),
+            //painter.setBandColor((uint8_t)(0.75f * nbands),
+            painter.setBandColor(4,
                 addColor(scaleColor(luxLevel, SHOT_THR_COLOUR),
                  scaleColor(1.f - luxLevel, underColor)));
         }
