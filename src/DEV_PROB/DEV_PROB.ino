@@ -53,19 +53,11 @@ struct Strategy { BlochVector a[2]; BlochVector b[2]; };
 const CorrelationDiag PHI_PLUS{1,-1,1}, PHI_MINUS{-1,1,1}, PSI_PLUS{1,1,-1}, PSI_MINUS{-1,-1,-1};
 
 
-
-
 // Inputs: Basis alice and Basis bob
 // Computes E = a^T . T . b
 static inline float corr_E(const CorrelationDiag& T, const BlochVector& a, const BlochVector& b) {
      return a.x * T.x_corr * b.x + a.y * T.y_corr * b.y + a.z * T.z_corr * b.z; 
     }
-
-// TODO: Add to utils?
-// Because of the shift I added I'm currently not using this anymore. I guess I could add a shift param with default 8?
-//static inline float uniform(uint32_t randIn) {
-//   return (randIn >> 8) * (1.0f / 16777216.0f); 
-//}
 
 // TODO: Normalize first. The comment says axes must be normalized, but nothing enforces it. Normalize the four vectors before building Strategy, or add a debug assert that ∣E∣≤1∣E∣≤1
 void lockIn(const CorrelationDiag& T, const Strategy& s) {    // axes must be normalized
@@ -106,9 +98,6 @@ uint32_t colourCrossFade(float phase, uint32_t topCol, uint32_t botCol)
     return addColor(scaleColor(a, topCol), scaleColor(b, botCol));
 }
 
-
-// TODO FUTURE: The inversion of the first leg should be handled at the source and not at
-// TODO REFACTOR: QBEADS SHOULD BE UPDATED TO NO LONGER HANDLE THE FIRST LEG ISSUE ITSELF
 // I'm writing this function assuming it is resolved 
 void setBandColour(uint8_t band_index, uint32_t newColour, bool crossFade = false, float crossPhase = 1.0f){
   //uint32_t oldColour = bead.getLegPixelColor(0, band_index);   // read BEFORE overwriting;
@@ -203,15 +192,6 @@ void loop() {
 
   bead.readIMU(false);                 // keep trackers alive; avoid long stalls
 
-  //if (running && rounds < N_TOTAL) {
-  //  for (uint8_t i = 0; i < BATCH && rounds < N_TOTAL; i++) {
-  //    bool qWin, cWin;
-  //    playRound(qWin, cWin);
-  //    qWins += qWin;
-  //    cWins += cWin;
-  //    rounds++;
-  //  }
-  //}
   if (rounds < N_TOTAL) {
     uint32_t elapsed = millis() - runStart;
     uint32_t target = (elapsed >= RUN_MS) ? N_TOTAL
