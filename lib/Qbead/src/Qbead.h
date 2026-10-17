@@ -13,10 +13,11 @@
 #include "internal/QbeadPixels.h"
 #include "internal/ShakeDetector.h"
 #include "internal/GravityTracker.h"
+#include "internal/ProbabilityDisplay.h"
 
 namespace Qbead
 {
-  class Qbead
+  class Qbead : public BandPainter
   {
   public:
     Qbead(const uint16_t pin00 = QB_LEDPIN,
@@ -32,6 +33,7 @@ namespace Qbead
           const bool sz = QB_SZ)
         : imu(LSM6DS3(I2C_MODE, imu_addr)),
           pixels(QbeadIndexed_NeoPixelStrip(nlegs * (nsections - 1) + 2, pin00, pixelconfig)),
+          prMode(*this, nsections + 1),
           nsections(nsections),
           nlegs(nlegs),
           theta_quant(180 / nsections),
@@ -44,9 +46,10 @@ namespace Qbead
     static Qbead *callbackTarget; // we need a global singleton static instance because bluefruit callbacks do not support context variables -- thankfully this is fine because there is indeed only one Qbead in existence at any time
 
     LSM6DS3 imu;
+    QbeadIndexed_NeoPixelStrip pixels;
     ShakeDetector shake;
     GravityTracker gravity;
-    QbeadIndexed_NeoPixelStrip pixels;
+    ProbabilityDisplay prMode;
     BLEManager::BLEManager ble;
     BlochVector innerStates[INNER_STATE_COUNT];
     uint8_t innerStateCount = 0;
@@ -192,6 +195,23 @@ namespace Qbead
     {
       int mappedPixelIndex = computePixelIndex(leg, pixel);
       pixels.setPixelColor(mappedPixelIndex, color);
+    }
+
+    // TODO: Future | Arbitrary bands like QBEADS
+    void setBandColor(int band, uint32_t color) override
+    {
+        if (band == 0 || band == nsections)
+        {
+            // First and last bands are just the single pixel poles
+            setLegPixelColor(0, band, color);
+        }
+        else
+        {
+            for (int leg = 0; leg < nlegs; leg++)
+            {
+                setLegPixelColor(leg, band, color);
+            }
+        }
     }
 
     uint32_t getLegPixelColor(int leg, int pixel)

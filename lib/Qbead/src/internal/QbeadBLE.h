@@ -4,6 +4,7 @@
 #include <bluefruit.h>
 #include "QbeadUtils.h"
 
+// FUTURE: Namespace management, make this also part of Qbead?
 namespace BLEManager
 {
   enum class CommandType : uint8_t

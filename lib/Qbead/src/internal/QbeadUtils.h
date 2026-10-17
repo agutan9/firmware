@@ -11,6 +11,7 @@ namespace Qbead
 #define QB_LEDPIN 10
 #define QB_PIXELCONFIG NEO_GRB + NEO_KHZ800
 #define QB_NSECTIONS 6
+#define QB_NBANDS (QB_NSECTIONS + 1)
 #define QB_NLEGS 12
 #define QB_IMU_ADDR 0x6A
 #define QB_IX 2
