@@ -12,7 +12,9 @@ namespace ChshStage
     {
         Idle,
         Choosing,
-        Collapsed
+        Collapsed,
+        AutomatedChoosing,
+        Simulating
     };
 
     // -----------------------------------------------------------------------------
@@ -59,10 +61,12 @@ namespace ChshStage
 
     // Axis is defined in QbeadUtils.h.
     Qbead::Axis localAxis = {0.f, 0.f, 1.f};
+    Qbead::Axis secondLocalAxis = {0.f, 0.f, 1.f};
     Qbead::Axis remoteAxis = {0.f, 0.f, 1.f};
     Qbead::Axis targetAxis = {0.f, 0.f, 1.f};
 
     bool localLocked = false;
+    bool secondLocalLocked = false;
     bool remoteLocked = false;
     bool targetAvailable = false;
 

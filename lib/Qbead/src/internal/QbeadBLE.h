@@ -22,6 +22,7 @@ namespace BLEManager
     ChshFirstSetting = 11,
     ChshResult = 12,
     ChshResultAck = 13,
+    ChshSimulating = 14,
   };
 
   struct DataPacket
