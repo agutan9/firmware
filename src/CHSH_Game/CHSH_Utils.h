@@ -206,7 +206,7 @@ namespace ChshUtils
             ChshUtils::drawAxisOn(
                 bead,
                 localAxis,
-                Qbead::color(210,207,2));
+                Qbead::color(210, 207, 2));
         }
         else
         {
@@ -546,36 +546,20 @@ namespace ChshUtils
         ChshStage::lastSendMs = millis();
     }
 
-    void lockLocalAxis(Qbead::Qbead &bead)
+    void lockLocalAxis(Qbead::Qbead &bead, bool secondStage = false)
     {
-        Qbead::Axis tappedAxis = {
-            bead.x_whentapped,
-            bead.y_whentapped,
-            bead.z_whentapped};
-
-        if (!Qbead::normalise(tappedAxis))
+        if (!firstChosen)
         {
-            Serial.println("[LOCK] Invalid tap axis; try again.");
-            return;
+            lockLocalAxis(bead, localAxis, localLocked);
+        }
+        else
+        {
+            lockLocalAxis(bead, secondLocalAxis, secondLocalLocked);
+            stage = ChshStage::Stage::Simulating;
+            ChshComms::sendMessage(BLEManager::CommandType::ChshSimulating, 1, bead);
         }
 
-        localAxis = ChshUtils::quantiseAxis(tappedAxis);
-        localLocked = true;
-
-        float thetaDeg;
-        float phiDeg;
-
-        Qbead::axisAngles(
-            localAxis,
-            thetaDeg,
-            phiDeg);
-
-        Serial.print("[LOCK] Actual theta = ");
-        Serial.print(thetaDeg);
-        Serial.print(", phi = ");
-        Serial.println(phiDeg);
-
-        if (targetAvailable)
+        if (targetAvailable && !secondStage)
         {
             const float dot =
                 Qbead::dotProduct(localAxis, targetAxis);
@@ -604,6 +588,36 @@ namespace ChshUtils
 
         ChshUtils::chshChoosing(
             bead);
+    }
+
+    void lockLocalAxis(Qbead::Qbead &bead, Qbead::Axis &localAxis, bool &localLocked)
+    {
+        Qbead::Axis tappedAxis = {
+            bead.x_whentapped,
+            bead.y_whentapped,
+            bead.z_whentapped};
+
+        if (!Qbead::normalise(tappedAxis))
+        {
+            Serial.println("[LOCK] Invalid tap axis; try again.");
+            return;
+        }
+
+        localAxis = ChshUtils::quantiseAxis(tappedAxis);
+        localLocked = true;
+
+        float thetaDeg;
+        float phiDeg;
+
+        Qbead::axisAngles(
+            localAxis,
+            thetaDeg,
+            phiDeg);
+
+        Serial.print("[LOCK] Actual theta = ");
+        Serial.print(thetaDeg);
+        Serial.print(", phi = ");
+        Serial.println(phiDeg);
     }
 }
 

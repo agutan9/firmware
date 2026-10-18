@@ -200,6 +200,22 @@ void loop()
 
         measureBothIfReady();
     }
+    else if (stage == ChshStage::Stage::AutomatedChoosing)
+    {
+        // maybe we could come here after a shake event or something
+        if (acceptedTap && !localLocked)
+            ChshUtils::lockLocalAxis(bead, true);
+        if (acceptedTap && !secondLocalLocked)
+            ChshUtils::lockLocalAxis(bead, true);
+    }
+    else if (stage == ChshStage::Stage::Simulating)
+    {
+        // do the simulation
+        if(acceptedTap)
+        {
+            stage = ChshStage::Stage::Idle;
+        }
+    }
     else
     {
         // Keep the outcome visible until the next entangle handshake.
