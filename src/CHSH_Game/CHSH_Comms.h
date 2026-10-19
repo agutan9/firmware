@@ -447,6 +447,37 @@ namespace ChshComms
             return;
         }
 
+        case Command::ChshSimulating:
+        {
+            if (packet.value == STAGE2_ENTER)
+            {
+                // Follow the peer from the result screen only.
+                if (stage == ChshStage::Stage::Collapsed)
+                    ChshUtils::enterSecondStage(bead, false);
+
+                // Always (re-)acknowledge once we are in stage 2,
+                // so the announcer stops resending.
+                if (
+                    stage == ChshStage::Stage::AutomatedChoosing ||
+                    stage == ChshStage::Stage::Simulating)
+                {
+                    ChshComms::sendMessage(
+                        Command::ChshSimulating,
+                        STAGE2_ENTER_ACK,
+                        bead);
+                }
+            }
+            else if (packet.value == STAGE2_ENTER_ACK)
+            {
+                if (stage2AnnouncePending)
+                    Serial.println("[STAGE2] Peer confirmed stage 2.");
+
+                stage2AnnouncePending = false;
+            }
+
+            return;
+        }
+
         default:
             // Leave unrelated command types alone.
             return;
@@ -485,6 +516,18 @@ namespace ChshComms
             {
                 ChshUtils::sendLocalLock(bead);
             }
+        }
+        else if (
+            stage2AnnouncePending &&
+            (stage == ChshStage::Stage::AutomatedChoosing ||
+             stage == ChshStage::Stage::Simulating))
+        {
+            ChshComms::sendMessage(
+                Command::ChshSimulating,
+                STAGE2_ENTER,
+                bead);
+
+            ChshStage::lastSendMs = now;
         }
         else if (
             BEAD_ID == 0 &&

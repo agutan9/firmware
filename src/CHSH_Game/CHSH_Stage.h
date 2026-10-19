@@ -28,6 +28,23 @@ namespace ChshStage
     static constexpr uint32_t TAP_GUARD_MS = 350;
     static constexpr uint32_t DISPLAY_MS = 40;
 
+    // Shake detection (raw accelerometer, units of g).
+    // A "peak" is a sample whose |a| deviates from 1 g by more than
+    // SHAKE_DEVIATION_G. SHAKE_PEAKS peaks within SHAKE_WINDOW_MS = shake.
+    static constexpr float SHAKE_DEVIATION_G = 1.0f;
+    static constexpr uint8_t SHAKE_PEAKS = 4;
+    static constexpr uint32_t SHAKE_WINDOW_MS = 1000;
+    static constexpr uint32_t SHAKE_PEAK_GAP_MS = 60;
+
+    // Shaking fires the IMU tap interrupt as well. Ignore taps for this
+    // long after entering stage 2, otherwise the shake itself locks the
+    // second axis immediately.
+    static constexpr uint32_t STAGE2_TAP_GUARD_MS = 1200;
+
+    // Values carried by CommandType::ChshSimulating.
+    static constexpr uint32_t STAGE2_ENTER = 1;     // "go to stage 2"
+    static constexpr uint32_t STAGE2_ENTER_ACK = 2; // "I am in stage 2"
+
     // true:
     // Generate local random inputs.
     // Show a 45-degree or 135-degree target according to x AND y.
@@ -85,6 +102,11 @@ namespace ChshStage
 
     bool resultPending = false;
     uint32_t resultMessage = 0;
+
+    // Stage 2 handshake: the bead that was shaken keeps announcing
+    // STAGE2_ENTER until the peer answers with STAGE2_ENTER_ACK.
+    bool stage2AnnouncePending = false;
+    uint32_t stage2EnteredMs = 0;
 
     uint32_t roundsPlayed = 0;
     uint32_t roundsWon = 0;

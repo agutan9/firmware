@@ -29,6 +29,9 @@ void startRound()
     resultPending = false;
     resultMessage = 0;
 
+    secondLocalLocked = false;
+    stage2AnnouncePending = false;
+
     localInput =
         USE_RANDOM_INPUTS ? (uint8_t)random(2) : 0;
     ChshUtils::startInputFlash(localInput);
@@ -158,8 +161,9 @@ void loop()
 {
     bead.readIMU(false);
 
-    // Consume the gesture exactly once.
+    // Consume the gestures exactly once.
     const bool tapped = bead.wasTapped();
+    const bool shaken = ChshUtils::detectShake(bead);
 
     // Process received settings before the current local tap.
     // This defines the coordinator's ordering for close-together taps.
@@ -202,42 +206,58 @@ void loop()
     }
     else if (stage == ChshStage::Stage::AutomatedChoosing)
     {
-        // maybe we could come here after a shake event or something
-        if (acceptedTap && !localLocked)
-            ChshUtils::lockLocalAxis(bead, true);
-        if (acceptedTap && !secondLocalLocked)
-            ChshUtils::lockLocalAxis(bead, true);
+        // Taps produced by the shake that brought us here are ignored.
+        const bool stage2TapAllowed =
+            (uint32_t)(now - stage2EnteredMs) >= STAGE2_TAP_GUARD_MS;
+
+        if (acceptedTap && stage2TapAllowed && !secondLocalLocked)
+            ChshUtils::lockSecondAxis(bead);
     }
     else if (stage == ChshStage::Stage::Simulating)
     {
-        // do the simulation
-        if(acceptedTap)
+        // TODO: stage-2 simulation goes here.
+
+        if (acceptedTap)
         {
             stage = ChshStage::Stage::Idle;
+            stage2AnnouncePending = false;
+            bead.clearStates();
+            ChshUtils::showIdle(bead);
+            Serial.println("[STAGE2] Back to idle; entangle again to restart.");
         }
     }
-    else
+    else // Collapsed
     {
-        // Keep the outcome visible until the next entangle handshake.
-        // Alice waits for confirmation of the previous result.
-        const bool canRestart =
+        // Alice may only leave once Bob has confirmed the result.
+        const bool resultSettled =
             BEAD_ID == 1 || !resultPending;
 
-        if (
-            canRestart &&
+        if (shaken && resultSettled)
+        {
+            ChshUtils::enterSecondStage(bead, true);
+        }
+        else if (
+            resultSettled &&
             bead.entangle(acceptedTap, ENTANGLED_STATE))
         {
+            // Keep the outcome visible until the next entangle handshake.
             startRound();
         }
     }
 
     ChshComms::serviceResends(bead);
 
-    if (
-        stage == ChshStage::Stage::Choosing &&
-        (uint32_t)(now - lastDisplayMs) >= DISPLAY_MS)
+    if ((uint32_t)(now - lastDisplayMs) >= DISPLAY_MS)
     {
-        lastDisplayMs = now;
-        ChshUtils::chshChoosing(bead);
+        if (stage == ChshStage::Stage::Choosing)
+        {
+            lastDisplayMs = now;
+            ChshUtils::chshChoosing(bead);
+        }
+        else if (stage == ChshStage::Stage::AutomatedChoosing)
+        {
+            lastDisplayMs = now;
+            ChshUtils::drawSecondStage(bead);
+        }
     }
 }

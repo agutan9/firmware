@@ -440,7 +440,7 @@ namespace ChshUtils
     // First-setting announcement and second target
     // -----------------------------------------------------------------------------
 
-    void updateSecondTarget(Qbead::Qbead &bead)
+    inline void updateSecondTarget(Qbead::Qbead &bead)
     {
         targetAvailable = false;
 
@@ -546,20 +546,50 @@ namespace ChshUtils
         ChshStage::lastSendMs = millis();
     }
 
-    void lockLocalAxis(Qbead::Qbead &bead, bool secondStage = false)
+    // Returns false (and leaves the outputs untouched) if the tap axis is
+    // unusable. Callers MUST stop when this returns false.
+    inline bool lockingLocalAxis(
+        Qbead::Qbead &bead,
+        Qbead::Axis &outAxis,
+        bool &outLocked)
     {
-        if (!firstChosen)
+        Qbead::Axis tappedAxis = {
+            bead.x_whentapped,
+            bead.y_whentapped,
+            bead.z_whentapped};
+
+        if (!Qbead::normalise(tappedAxis))
         {
-            lockLocalAxis(bead, localAxis, localLocked);
-        }
-        else
-        {
-            lockLocalAxis(bead, secondLocalAxis, secondLocalLocked);
-            stage = ChshStage::Stage::Simulating;
-            ChshComms::sendMessage(BLEManager::CommandType::ChshSimulating, 1, bead);
+            Serial.println("[LOCK] Invalid tap axis; try again.");
+            return false;
         }
 
-        if (targetAvailable && !secondStage)
+        outAxis = ChshUtils::quantiseAxis(tappedAxis);
+        outLocked = true;
+
+        float thetaDeg;
+        float phiDeg;
+
+        Qbead::axisAngles(
+            outAxis,
+            thetaDeg,
+            phiDeg);
+
+        Serial.print("[LOCK] Actual theta = ");
+        Serial.print(thetaDeg);
+        Serial.print(", phi = ");
+        Serial.println(phiDeg);
+
+        return true;
+    }
+
+    // Stage 1 only. Same behaviour as before stage 2 was introduced.
+    inline void lockLocalAxis(Qbead::Qbead &bead)
+    {
+        if (!lockingLocalAxis(bead, localAxis, localLocked))
+            return;
+
+        if (targetAvailable)
         {
             const float dot =
                 Qbead::dotProduct(localAxis, targetAxis);
@@ -586,38 +616,126 @@ namespace ChshUtils
             sendLocalLock(bead);
         }
 
-        ChshUtils::chshChoosing(
-            bead);
+        ChshUtils::chshChoosing(bead);
     }
 
-    void lockLocalAxis(Qbead::Qbead &bead, Qbead::Axis &localAxis, bool &localLocked)
-    {
-        Qbead::Axis tappedAxis = {
-            bead.x_whentapped,
-            bead.y_whentapped,
-            bead.z_whentapped};
+    // -------------------------------------------------------------------------
+    // Shake detection
+    // -------------------------------------------------------------------------
+    //
+    // Call once per loop, after bead.readIMU(). Uses the raw (unfiltered)
+    // acceleration bead.rx/ry/rz in units of g. Returns true once per shake.
 
-        if (!Qbead::normalise(tappedAxis))
+    inline bool detectShake(Qbead::Qbead &bead)
+    {
+        static uint8_t peaks = 0;
+        static uint32_t firstPeakMs = 0;
+        static uint32_t lastPeakMs = 0;
+
+        const uint32_t now = millis();
+
+        if (peaks > 0 && (uint32_t)(now - firstPeakMs) > SHAKE_WINDOW_MS)
+            peaks = 0;
+
+        const float mag = sqrtf(
+            bead.rx * bead.rx +
+            bead.ry * bead.ry +
+            bead.rz * bead.rz);
+
+        if (fabsf(mag - 1.f) < SHAKE_DEVIATION_G)
+            return false;
+
+        if (peaks > 0 && (uint32_t)(now - lastPeakMs) < SHAKE_PEAK_GAP_MS)
+            return false;
+
+        if (peaks == 0)
+            firstPeakMs = now;
+
+        lastPeakMs = now;
+
+        if (++peaks < SHAKE_PEAKS)
+            return false;
+
+        peaks = 0;
+        return true;
+    }
+
+    // -------------------------------------------------------------------------
+    // Stage 2
+    // -------------------------------------------------------------------------
+
+    inline void drawSecondStage(Qbead::Qbead &bead)
+    {
+        bead.clear();
+
+        // Stage-1 outcome stays on the sphere as a reference.
+        bead.displayCurrentStatesStatic();
+
+        if (secondLocalLocked)
         {
-            Serial.println("[LOCK] Invalid tap axis; try again.");
-            return;
+            ChshUtils::addAxisOn(
+                bead,
+                secondLocalAxis,
+                Qbead::color(210, 207, 2));
+        }
+        else
+        {
+            ChshUtils::addAxisOn(
+                bead,
+                ChshUtils::previewAxisFor(bead),
+                Qbead::color(70, 70, 70));
         }
 
-        localAxis = ChshUtils::quantiseAxis(tappedAxis);
-        localLocked = true;
+        bead.show();
+    }
 
-        float thetaDeg;
-        float phiDeg;
+    // announce = true on the bead that was shaken,
+    // false on the bead that follows the peer's announcement.
+    inline void enterSecondStage(Qbead::Qbead &bead, bool announce)
+    {
+        stage = ChshStage::Stage::AutomatedChoosing;
 
-        Qbead::axisAngles(
-            localAxis,
-            thetaDeg,
-            phiDeg);
+        secondLocalLocked = false;
+        secondLocalAxis = {0.f, 0.f, 1.f};
 
-        Serial.print("[LOCK] Actual theta = ");
-        Serial.print(thetaDeg);
-        Serial.print(", phi = ");
-        Serial.println(phiDeg);
+        stage2EnteredMs = millis();
+        stage2AnnouncePending = announce;
+
+        // Both beads are past the result screen, so the result handshake
+        // is complete (Bob only leaves Collapsed after acknowledging it).
+        resultPending = false;
+
+        // Drop any tap generated by the shake itself.
+        bead.wasTapped();
+
+        if (announce)
+        {
+            ChshComms::sendMessage(
+                BLEManager::CommandType::ChshSimulating,
+                STAGE2_ENTER,
+                bead);
+
+            ChshStage::lastSendMs = millis();
+        }
+
+        Serial.println(
+            announce
+                ? "[STAGE2] Shake detected; entering stage 2."
+                : "[STAGE2] Peer entered stage 2; following.");
+
+        drawSecondStage(bead);
+    }
+
+    inline void lockSecondAxis(Qbead::Qbead &bead)
+    {
+        if (!lockingLocalAxis(bead, secondLocalAxis, secondLocalLocked))
+            return;
+
+        Serial.println("[STAGE2] Second axis locked; simulating.");
+
+        stage = ChshStage::Stage::Simulating;
+
+        drawSecondStage(bead);
     }
 }
 
