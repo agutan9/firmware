@@ -131,7 +131,8 @@ void loop() {
     bead.prMode.showDualLiquidFill(cWins, rounds - cWins, N_TOTAL);
   }
   else {
-    bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL);
+    //bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL);
+    bead.prMode.showDualLiquidFill(854, 146, 1000); // TEST OF TRUE Q LIMIT
   }
   // Th must be after initial draw
   bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
