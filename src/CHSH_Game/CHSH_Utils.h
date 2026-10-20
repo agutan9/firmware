@@ -689,6 +689,26 @@ namespace ChshUtils
         bead.show();
     }
 
+    // -------------------------------------------------------------------------
+    // Stage-2 messages
+    // -------------------------------------------------------------------------
+
+    inline uint32_t stage2Value(uint32_t code)
+    {
+        return code | ((uint32_t)BEAD_ID << STAGE2_ROLE_SHIFT);
+    }
+
+    inline void sendSecondAxis(Qbead::Qbead &bead)
+    {
+        ChshComms::sendAxisMessage(
+            BLEManager::CommandType::ChshSimulating,
+            stage2Value(STAGE2_AXIS),
+            secondLocalAxis,
+            bead);
+
+        ChshStage::lastSendMs = millis();
+    }
+
     // announce = true on the bead that was shaken,
     // false on the bead that follows the peer's announcement.
     inline void enterSecondStage(Qbead::Qbead &bead, bool announce)
@@ -697,6 +717,16 @@ namespace ChshUtils
 
         secondLocalLocked = false;
         secondLocalAxis = {0.f, 0.f, 1.f};
+
+        remoteSecondLocked = false;
+        remoteSecondAxis = {0.f, 0.f, 1.f};
+        secondAxisAcked = false;
+
+        simStarted = false;
+        simDone = false;
+        simRounds = 0;
+        simWins = 0;
+        simExpected = 0.f;
 
         stage2EnteredMs = millis();
         stage2AnnouncePending = announce;
@@ -712,7 +742,7 @@ namespace ChshUtils
         {
             ChshComms::sendMessage(
                 BLEManager::CommandType::ChshSimulating,
-                STAGE2_ENTER,
+                stage2Value(STAGE2_ENTER),
                 bead);
 
             ChshStage::lastSendMs = millis();
@@ -723,6 +753,8 @@ namespace ChshUtils
                 ? "[STAGE2] Shake detected; entering stage 2."
                 : "[STAGE2] Peer entered stage 2; following.");
 
+        Serial.println("[STAGE2] Choose your second axis, then tap.");
+
         drawSecondStage(bead);
     }
 
@@ -731,11 +763,227 @@ namespace ChshUtils
         if (!lockingLocalAxis(bead, secondLocalAxis, secondLocalLocked))
             return;
 
-        Serial.println("[STAGE2] Second axis locked; simulating.");
+        Serial.println("[STAGE2] Second axis locked; sending to peer.");
 
+        // Resent by serviceResends() until STAGE2_AXIS_ACK arrives.
+        sendSecondAxis(bead);
+
+        // Simulating = "locked, waiting for / running the simulation".
         stage = ChshStage::Stage::Simulating;
 
         drawSecondStage(bead);
+    }
+
+    // -------------------------------------------------------------------------
+    // Stage-2 simulation
+    // -------------------------------------------------------------------------
+    //
+    // Measurement settings after both stages:
+    //
+    //   Alice: A[localInput]  = localAxis        (stage 1)
+    //          A[1-localInput]= secondLocalAxis  (stage 2)
+    //   Bob:   B[remoteInput] = remoteAxis       (stage 1)
+    //          B[1-remoteInput]= remoteSecondAxis (stage 2)
+    //
+    // Only Alice needs all four. Bob's classical strategy needs none.
+
+    inline void aliceSettings(Qbead::Axis A[2], Qbead::Axis B[2])
+    {
+        A[localInput & 1U] = localAxis;
+        A[(localInput & 1U) ^ 1U] = secondLocalAxis;
+
+        B[remoteInput & 1U] = remoteAxis;
+        B[(remoteInput & 1U) ^ 1U] = remoteSecondAxis;
+    }
+
+    inline float randomUnit()
+    {
+        return random(1000000L) / 1000000.f;
+    }
+
+    // Exact win probability of the quantum strategy for the four axes,
+    // averaged over uniformly random inputs x, y.
+    inline float quantumExpectedWin(const Qbead::Axis A[2], const Qbead::Axis B[2])
+    {
+        float sum = 0.f;
+
+        for (uint8_t x = 0; x < 2; ++x)
+        {
+            for (uint8_t y = 0; y < 2; ++y)
+            {
+                const float pSame =
+                    sameOutcomeProbability(A[x], B[y]);
+
+                sum += (x & y) == 0 ? pSame : 1.f - pSame;
+            }
+        }
+
+        return 0.25f * sum;
+    }
+
+    // One round of the quantum game on |Phi+>. Returns true on a win.
+    inline bool quantumRound(const Qbead::Axis A[2], const Qbead::Axis B[2])
+    {
+        const uint8_t x = (uint8_t)random(2);
+        const uint8_t y = (uint8_t)random(2);
+
+        const float pSame =
+            sameOutcomeProbability(A[x], B[y]);
+
+        const uint8_t a = (uint8_t)random(2);
+        const uint8_t b = randomUnit() < pSame ? a : (a ^ 1U);
+
+        return (a ^ b) == (x & y);
+    }
+
+    // One round of the optimal deterministic classical strategy:
+    // both players always answer 0. Wins unless x = y = 1, i.e. 75%.
+    inline bool classicalRound()
+    {
+        const uint8_t x = (uint8_t)random(2);
+        const uint8_t y = (uint8_t)random(2);
+
+        const uint8_t a = 0;
+        const uint8_t b = 0;
+
+        return (a ^ b) == (x & y);
+    }
+
+    // Win-rate bar: lights the fraction of pixels equal to the win rate.
+    inline void drawWinRate(Qbead::Qbead &bead, float rate, uint32_t pixelColor)
+    {
+        bead.clear();
+
+        const uint16_t n = bead.pixels.numPixels();
+        uint16_t lit = (uint16_t)lroundf(Qbead::clampUnit(rate) * n);
+
+        if (lit > n)
+            lit = n;
+
+        for (uint16_t i = 0; i < lit; ++i)
+            bead.pixels.setPixelColor(i, pixelColor);
+
+        bead.show();
+    }
+
+    inline uint32_t simColor()
+    {
+        // Alice / quantum: cyan. Bob / classical: orange.
+        return BEAD_ID == 0
+                   ? Qbead::color(0, 90, 120)
+                   : Qbead::color(140, 60, 0);
+    }
+
+    inline void printSimSummary()
+    {
+        const float rate =
+            simRounds == 0 ? 0.f : (float)simWins / (float)simRounds;
+
+        Serial.print(
+            BEAD_ID == 0
+                ? "[SIM] Quantum (Alice): "
+                : "[SIM] Classical (Bob): ");
+        Serial.print(simWins);
+        Serial.print("/");
+        Serial.print(simRounds);
+        Serial.print(" = ");
+        Serial.print(100.f * rate, 2);
+        Serial.println("%");
+
+        Serial.print("[SIM] Expected: ");
+        Serial.print(100.f * simExpected, 2);
+        Serial.println("%");
+
+        // Win probability p relates to the CHSH value by S = 8 (p - 1/2).
+        Serial.print("[SIM] S = 8(p - 1/2) = ");
+        Serial.println(8.f * (rate - 0.5f), 3);
+
+        Serial.println("[SIM] Classical bound 75% (S = 2), Tsirelson 85.36% (S = 2.828).");
+    }
+
+    inline void startSimulation(Qbead::Qbead &bead)
+    {
+        simStarted = true;
+        simDone = false;
+        simRounds = 0;
+        simWins = 0;
+
+        if (BEAD_ID == 0)
+        {
+            Qbead::Axis A[2];
+            Qbead::Axis B[2];
+            aliceSettings(A, B);
+
+            simExpected = quantumExpectedWin(A, B);
+
+            Serial.println("[SIM] Both second axes known; running quantum CHSH.");
+
+            for (uint8_t i = 0; i < 2; ++i)
+            {
+                float t, ph;
+
+                Qbead::axisAngles(A[i], t, ph);
+                Serial.print("[SIM] A");
+                Serial.print(i);
+                Serial.print(": theta = ");
+                Serial.print(t);
+                Serial.print(", phi = ");
+                Serial.println(ph);
+
+                Qbead::axisAngles(B[i], t, ph);
+                Serial.print("[SIM] B");
+                Serial.print(i);
+                Serial.print(": theta = ");
+                Serial.print(t);
+                Serial.print(", phi = ");
+                Serial.println(ph);
+            }
+        }
+        else
+        {
+            simExpected = 0.75f;
+
+            Serial.println("[SIM] Both second axes known; running classical CHSH (a = b = 0).");
+        }
+
+        drawWinRate(bead, 0.f, simColor());
+    }
+
+    // Runs SIM_BATCH rounds per call so loop() stays responsive
+    // (BLE packets, resends and the display keep being serviced).
+    inline void stepSimulation(Qbead::Qbead &bead)
+    {
+        if (!simStarted || simDone)
+            return;
+
+        Qbead::Axis A[2];
+        Qbead::Axis B[2];
+
+        if (BEAD_ID == 0)
+            aliceSettings(A, B);
+
+        for (uint16_t i = 0; i < SIM_BATCH && simRounds < SIM_ROUNDS; ++i)
+        {
+            const bool won =
+                BEAD_ID == 0 ? quantumRound(A, B) : classicalRound();
+
+            ++simRounds;
+
+            if (won)
+                ++simWins;
+        }
+
+        drawWinRate(
+            bead,
+            (float)simWins / (float)simRounds,
+            simColor());
+
+        if (simRounds >= SIM_ROUNDS)
+        {
+            simDone = true;
+            printSimSummary();
+            Serial.println("[SIM] Done. Tap to return to idle.");
+        }
     }
 }
 

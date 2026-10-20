@@ -42,8 +42,24 @@ namespace ChshStage
     static constexpr uint32_t STAGE2_TAP_GUARD_MS = 1200;
 
     // Values carried by CommandType::ChshSimulating.
+    //
+    // bits 0..2: message code (below)
+    // bit  3:    sender's role (BEAD_ID)
+    //
+    // STAGE2_AXIS carries the sender's second axis in theta/phi.
     static constexpr uint32_t STAGE2_ENTER = 1;     // "go to stage 2"
     static constexpr uint32_t STAGE2_ENTER_ACK = 2; // "I am in stage 2"
+    static constexpr uint32_t STAGE2_AXIS = 3;      // "my second axis"
+    static constexpr uint32_t STAGE2_AXIS_ACK = 4;  // "got your second axis"
+
+    static constexpr uint32_t STAGE2_CODE_MASK = 0x7UL;
+    static constexpr uint8_t STAGE2_ROLE_SHIFT = 3;
+
+    // Stage-2 simulation.
+    // Alice: quantum CHSH with her two axes and Bob's two axes.
+    // Bob:   classical optimal strategy (a = b = 0), wins 75%.
+    static constexpr uint32_t SIM_ROUNDS = 2000;
+    static constexpr uint16_t SIM_BATCH = 25; // rounds per loop() pass
 
     // true:
     // Generate local random inputs.
@@ -107,6 +123,19 @@ namespace ChshStage
     // STAGE2_ENTER until the peer answers with STAGE2_ENTER_ACK.
     bool stage2AnnouncePending = false;
     uint32_t stage2EnteredMs = 0;
+
+    // Peer's second axis (received over BLE) and whether the peer has
+    // confirmed receiving ours.
+    Qbead::Axis remoteSecondAxis = {0.f, 0.f, 1.f};
+    bool remoteSecondLocked = false;
+    bool secondAxisAcked = false;
+
+    // Simulation progress.
+    bool simStarted = false;
+    bool simDone = false;
+    uint32_t simRounds = 0;
+    uint32_t simWins = 0;
+    float simExpected = 0.f; // exact expected win probability
 
     uint32_t roundsPlayed = 0;
     uint32_t roundsWon = 0;

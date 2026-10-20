@@ -449,33 +449,122 @@ namespace ChshComms
 
         case Command::ChshSimulating:
         {
-            if (packet.value == STAGE2_ENTER)
+            const uint32_t code =
+                packet.value & STAGE2_CODE_MASK;
+
+            const uint8_t senderRole =
+                (uint8_t)((packet.value >> STAGE2_ROLE_SHIFT) & 1U);
+
+            // Ignore our own echoes / malformed packets.
+            if (
+                senderRole != (uint8_t)(BEAD_ID ^ 1U) ||
+                (packet.value >> (STAGE2_ROLE_SHIFT + 1)) != 0)
+            {
+                return;
+            }
+
+            const bool inStage2 =
+                stage == ChshStage::Stage::AutomatedChoosing ||
+                stage == ChshStage::Stage::Simulating;
+
+            switch (code)
+            {
+            case STAGE2_ENTER:
             {
                 // Follow the peer from the result screen only.
                 if (stage == ChshStage::Stage::Collapsed)
                     ChshUtils::enterSecondStage(bead, false);
 
-                // Always (re-)acknowledge once we are in stage 2,
-                // so the announcer stops resending.
+                // (Re-)acknowledge so the announcer stops resending.
                 if (
                     stage == ChshStage::Stage::AutomatedChoosing ||
                     stage == ChshStage::Stage::Simulating)
                 {
                     ChshComms::sendMessage(
                         Command::ChshSimulating,
-                        STAGE2_ENTER_ACK,
+                        ChshUtils::stage2Value(STAGE2_ENTER_ACK),
                         bead);
                 }
+
+                return;
             }
-            else if (packet.value == STAGE2_ENTER_ACK)
+
+            case STAGE2_ENTER_ACK:
             {
                 if (stage2AnnouncePending)
                     Serial.println("[STAGE2] Peer confirmed stage 2.");
 
                 stage2AnnouncePending = false;
+                return;
             }
 
-            return;
+            case STAGE2_AXIS:
+            {
+                // We already finished and went idle, but the peer missed
+                // our last ACK: acknowledge again so it can finish too.
+                if (stage == ChshStage::Stage::Idle)
+                {
+                    ChshComms::sendMessage(
+                        Command::ChshSimulating,
+                        ChshUtils::stage2Value(STAGE2_AXIS_ACK),
+                        bead);
+                    return;
+                }
+
+                // An axis implies the peer is in stage 2, even if its
+                // STAGE2_ENTER was lost.
+                if (stage == ChshStage::Stage::Collapsed)
+                    ChshUtils::enterSecondStage(bead, false);
+
+                if (
+                    stage != ChshStage::Stage::AutomatedChoosing &&
+                    stage != ChshStage::Stage::Simulating)
+                {
+                    return;
+                }
+
+                // The peer sending an axis also confirms our ENTER.
+                stage2AnnouncePending = false;
+
+                if (!remoteSecondLocked)
+                {
+                    Qbead::Axis decoded;
+
+                    if (!ChshComms::axisFromPacket(packet, decoded))
+                        return;
+
+                    remoteSecondAxis = decoded;
+                    remoteSecondLocked = true;
+
+                    Serial.print("[STAGE2] Peer's second axis: theta = ");
+                    Serial.print(packet.theta);
+                    Serial.print(", phi = ");
+                    Serial.println(packet.phi);
+                }
+
+                // Always acknowledge, also for duplicates.
+                ChshComms::sendMessage(
+                    Command::ChshSimulating,
+                    ChshUtils::stage2Value(STAGE2_AXIS_ACK),
+                    bead);
+
+                return;
+            }
+
+            case STAGE2_AXIS_ACK:
+            {
+                if (inStage2 && secondLocalLocked && !secondAxisAcked)
+                {
+                    secondAxisAcked = true;
+                    Serial.println("[STAGE2] Peer received our second axis.");
+                }
+
+                return;
+            }
+
+            default:
+                return;
+            }
         }
 
         default:
@@ -518,16 +607,23 @@ namespace ChshComms
             }
         }
         else if (
-            stage2AnnouncePending &&
-            (stage == ChshStage::Stage::AutomatedChoosing ||
-             stage == ChshStage::Stage::Simulating))
+            stage == ChshStage::Stage::AutomatedChoosing ||
+            stage == ChshStage::Stage::Simulating)
         {
-            ChshComms::sendMessage(
-                Command::ChshSimulating,
-                STAGE2_ENTER,
-                bead);
+            if (secondLocalLocked && !secondAxisAcked)
+            {
+                // Our axis also tells the peer we are in stage 2.
+                ChshUtils::sendSecondAxis(bead);
+            }
+            else if (stage2AnnouncePending)
+            {
+                ChshComms::sendMessage(
+                    Command::ChshSimulating,
+                    ChshUtils::stage2Value(STAGE2_ENTER),
+                    bead);
 
-            ChshStage::lastSendMs = now;
+                ChshStage::lastSendMs = now;
+            }
         }
         else if (
             BEAD_ID == 0 &&
