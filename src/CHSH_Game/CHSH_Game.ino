@@ -30,7 +30,12 @@ void startRound()
     resultMessage = 0;
 
     secondLocalLocked = false;
+    remoteSecondLocked = false;
+    secondAxisAcked = false;
     stage2AnnouncePending = false;
+
+    simStarted = false;
+    simDone = false;
 
     localInput =
         USE_RANDOM_INPUTS ? (uint8_t)random(2) : 0;
@@ -215,9 +220,18 @@ void loop()
     }
     else if (stage == ChshStage::Stage::Simulating)
     {
-        // TODO: stage-2 simulation goes here.
+        // Wait until both second axes are known, then:
+        //   Alice -> quantum CHSH with all four axes
+        //   Bob   -> classical a = b = 0 strategy (75%)
+        // TODO swap this to the simulation code
+        if (!simStarted && secondLocalLocked && remoteSecondLocked)
+            ChshUtils::startSimulation(bead);
 
-        if (acceptedTap)
+        ChshUtils::stepSimulation(bead);
+
+        // Leave only when finished AND the peer has our axis,
+        // otherwise the peer would wait forever.
+        if (acceptedTap && simDone && secondAxisAcked)
         {
             stage = ChshStage::Stage::Idle;
             stage2AnnouncePending = false;
@@ -254,8 +268,11 @@ void loop()
             lastDisplayMs = now;
             ChshUtils::chshChoosing(bead);
         }
-        else if (stage == ChshStage::Stage::AutomatedChoosing)
+        else if (
+            stage == ChshStage::Stage::AutomatedChoosing ||
+            (stage == ChshStage::Stage::Simulating && !simStarted))
         {
+            // Live preview, or the locked axis while waiting for the peer.
             lastDisplayMs = now;
             ChshUtils::drawSecondStage(bead);
         }
