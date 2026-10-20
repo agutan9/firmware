@@ -10,6 +10,7 @@ namespace Qbead
 #define QB_LEDPIN 10
 #define QB_PIXELCONFIG NEO_GRB + NEO_KHZ800
 #define QB_NSECTIONS 6
+#define QB_NBANDS (QB_NSECTIONS + 1)
 #define QB_NLEGS 12
 #define QB_IMU_ADDR 0x6A
 #define QB_IX 2
@@ -45,6 +46,7 @@ namespace Qbead
         {0x45, 0x8d, 0x08, 0xaa, 0xd6, 0x63, 0x44, 0x25, 0xbe, 0x12, 0x9c, 0x35, 0xc6 + 5, 0x1f, 0x0c, 0xe3};
 
     const uint8_t zerobuffer20[] = {0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0};
+    static uint32_t stateRNG = 0x9E3779B9u; // global to ensure rng consistancy across libs
 
     // TODO manage namespaces better
     static uint32_t color(uint8_t r, uint8_t g, uint8_t b)
@@ -215,6 +217,21 @@ namespace Qbead
         float x;
         float y;
         float z;
+
+        Axis()
+        {
+            x = 0;
+            y = 0;
+            z = 1;
+        }
+
+        Axis(float x, float y, float z)
+        {
+            float lenght = sqrt(x * x + y * y + z * z);
+            this->x = x / lenght;
+            this->y = y / lenght;
+            this->z = z / lenght;
+        }
     };
 
     inline float clampUnit(float value)
@@ -298,6 +315,78 @@ namespace Qbead
 
         normalise(perpendicular);
         return perpendicular;
+    }
+
+    /**
+     * @brief Get a 32-bit seed from the nRF52840 hardware random number generator.
+     *
+     * When the SoftDevice is running, the bytes come from the SoftDevice's random
+     * pool, which is fed by the chip's hardware RNG (a true random source based
+     * on thermal noise, not a deterministic algorithm).
+     *
+     * If the SoftDevice is not running or the pool is empty, falls back to a
+     * micros()-based value. That fallback is NOT truly random.
+     *
+     * Advised to avoid using sd_rand for all your rng calls as it's more error prone
+     * and has incosistent call execution times.
+     *
+     * @return uint32_t Non-zero seed value.
+     */
+    static uint32_t getHardwareSeed()
+    {
+        uint8_t softDeviceOn = 0;
+        uint32_t seed = 0;
+        if (
+            sd_softdevice_is_enabled(&softDeviceOn) == NRF_SUCCESS &&
+            softDeviceOn &&
+            sd_rand_application_vector_get((uint8_t *)&seed, sizeof(seed)) == NRF_SUCCESS)
+        {
+            // Fall back to constant seed in the rare case we pull 0
+            seed = seed ? seed : 0x9E3779B9u;
+            Serial.println("[INFO]{RNG} BLE-Stack active and running. Retrieved true random seed!");
+            Serial.printf("[INFO]{RNG} Seed: %u\n", seed);
+        }
+        else
+        {
+            // In principle one can access the RNG register directly when SoftDevice is off
+            // When it is on, this becomes protected memory. However, because the Qbead should
+            // always have the BLE stack on we opt for a simple pseudo-random fallback here.
+            seed = (micros() ^ 0xA5A5A5A5u) | 1u; // fallback, never 0
+            Serial.println("[INFO]{RNG} Error in accessing RNG per BLE-stack. Falling back to pseudo-random seed!");
+            Serial.printf("[INFO]{RNG} Seed: %u\n", seed);
+            // micros near boot will be very similar each time! beware
+        }
+        return seed;
+    }
+    /**
+     * @brief Deterministically seeds the global RNG state.
+     *
+     * @param s The seed may not be 0! If a 0 is passed the seed falls back to a constant value.
+     */
+    static inline void seedRNG(uint32_t s) { stateRNG = s ? s : 0x9E3779B9u; }
+
+    /**
+     * @brief Advance the shared xorshift32 generator and return the next value.
+     *
+     * Marsaglia's xorshift32 (shifts 13, 17, 5). It steps through every non-zero
+     * 32-bit value exactly once before repeating, so the period is 2^32 - 1.
+     *
+     * Fully deterministic when seeded. Seed it by way of seedRNG() (and getHardwareSeed()).
+     *
+     * @note stateRNG must never be 0. A zero state stays zero forever, so
+     *       seedRNG() substitutes a non-zero constant.
+     * @note Not cryptographically secure, and the lowest bits are the weakest.
+     *       Use the high bits where it is cheap to do so.
+     * @note Not safe to call from an interrupt, since it modifies shared state.
+     *
+     * @return uint32_t The next pseudo-random 32-bit value (never 0).
+     */
+    static inline uint32_t updateRNG()
+    {
+        stateRNG ^= stateRNG << 13;
+        stateRNG ^= stateRNG >> 17;
+        stateRNG ^= stateRNG << 5;
+        return stateRNG;
     }
 }
 
