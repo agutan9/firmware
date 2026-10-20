@@ -42,6 +42,20 @@ namespace ChshStage
     // second axis immediately.
     static constexpr uint32_t STAGE2_TAP_GUARD_MS = 1200;
 
+    // Textbook CHSH settings shown as stage-2 targets (theta, phi in deg).
+    // For |Phi+> they give the Tsirelson win rate cos^2(pi/8) = 85.36%.
+    //
+    //   Alice: input 0 -> Z               input 1 -> X
+    //   Bob:   input 0 -> (Z + X)/sqrt2   input 1 -> (Z - X)/sqrt2
+    static constexpr float STAGE2_TARGET_THETA[2][2] = {
+        {0.f, 90.f},  // Alice
+        {45.f, 45.f}, // Bob
+    };
+    static constexpr float STAGE2_TARGET_PHI[2][2] = {
+        {0.f, 0.f},   // Alice
+        {0.f, 180.f}, // Bob
+    };
+
     // Values carried by CommandType::ChshSimulating.
     //
     // bits 0..2: message code (below)
@@ -60,6 +74,7 @@ namespace ChshStage
     static constexpr uint8_t STAGE2_ROLE_SHIFT = 3;
     static constexpr uint8_t STAGE2_INDEX_SHIFT = 4;
     static constexpr uint8_t STAGE2_VALUE_BITS = 5; // anything above is invalid
+
 
     // true:
     // Generate local random inputs.

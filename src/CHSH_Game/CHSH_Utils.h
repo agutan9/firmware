@@ -553,29 +553,11 @@ namespace ChshUtils
         Qbead::Axis &outAxis,
         bool &outLocked)
     {
-        // Qbead::wasTapped() copies the raw sample with the axis
-        // permutation (ix, iy, iz) but WITHOUT the sign flips (sx, sy, sz)
-        // that readIMU() applies to x/y/z, rx/ry/rz and the gravity
-        // estimate. With QB_SY = QB_SZ = 1 this maps (x, y, z) to
-        // (x, -y, -z): the locked axis lands in the opposite hemisphere
-        // of the live preview. Apply the same signs here.
-        //
-        // If your fork already applies the signs inside wasTapped(),
-        // set CHSH_TAP_SIGN_FIX to 0.
-#ifndef CHSH_TAP_SIGN_FIX
-#define CHSH_TAP_SIGN_FIX 1
-#endif
-#if CHSH_TAP_SIGN_FIX
-        Qbead::Axis tappedAxis = {
-            (bead.sx ? -1.f : 1.f) * bead.x_whentapped,
-            (bead.sy ? -1.f : 1.f) * bead.y_whentapped,
-            (bead.sz ? -1.f : 1.f) * bead.z_whentapped};
-#else
+
         Qbead::Axis tappedAxis = {
             bead.x_whentapped,
             bead.y_whentapped,
             bead.z_whentapped};
-#endif
 
         if (!Qbead::normalise(tappedAxis))
         {
@@ -694,6 +676,14 @@ namespace ChshUtils
     // Stage 2
     // -------------------------------------------------------------------------
 
+    // Textbook CHSH target for this bead and input (0 or 1).
+    inline Qbead::Axis stage2Target(uint8_t index)
+    {
+        return Qbead::axisFromDegrees(
+            STAGE2_TARGET_THETA[BEAD_ID][index & 1U],
+            STAGE2_TARGET_PHI[BEAD_ID][index & 1U]);
+    }
+
     inline void drawSecondStage(Qbead::Qbead &bead)
     {
         bead.clear();
@@ -701,31 +691,49 @@ namespace ChshUtils
         // Stage-1 outcome stays on the sphere as a reference.
         bead.displayCurrentStatesStatic();
 
-        // Axis 0 (input 0): yellow once locked.
-        if (localLocked)
-        {
-            ChshUtils::addAxisOn(
-                bead,
-                localAxis,
-                Qbead::color(210, 207, 2));
-        }
-
-        // Axis 1 (input 1): orange once locked.
-        if (secondLocalLocked)
-        {
-            ChshUtils::addAxisOn(
-                bead,
-                secondLocalAxis,
-                Qbead::color(200, 80, 0));
-        }
-
-        // Live preview while something is still to be chosen.
+        // Live preview first, so the targets stay visible on top
+        // (same order as the stage-1 screen).
         if (!localLocked || !secondLocalLocked)
         {
             ChshUtils::addAxisOn(
                 bead,
                 ChshUtils::previewAxisFor(bead),
                 Qbead::color(70, 70, 70));
+        }
+
+        const uint32_t yellow = Qbead::color(210, 207, 2);
+        const uint32_t green = Qbead::color(0, 160, 40);
+
+        // Textbook targets: yellow until that input's axis is chosen,
+        // then green.
+        if (localLocked)
+        {
+            ChshUtils::addAxisOn(
+                bead,
+                {localAxis.x, localAxis.y, localAxis.z},
+                green);
+        }
+        else
+        {
+            ChshUtils::addAxisOn(
+                bead,
+                stage2Target(0),
+                yellow);
+        }
+
+        if (secondLocalLocked)
+        {
+            ChshUtils::addAxisOn(
+                bead,
+                {secondLocalAxis.x, secondLocalAxis.y, secondLocalAxis.z},
+                green);
+        }
+        else
+        {
+            ChshUtils::addAxisOn(
+                bead,
+                stage2Target(1),
+                yellow);
         }
 
         bead.show();
@@ -838,6 +846,18 @@ namespace ChshUtils
         Serial.print("[STAGE2] Axis for input ");
         Serial.print(index);
         Serial.println(" locked; sending to peer.");
+
+        {
+            const Qbead::Axis &chosen =
+                index == 0 ? localAxis : secondLocalAxis;
+
+            const float dot =
+                Qbead::dotProduct(chosen, stage2Target(index));
+
+            Serial.print("[STAGE2] Error to textbook axis = ");
+            Serial.print(acosf(Qbead::clampUnit(dot)) * RAD_TO_DEG, 1);
+            Serial.println(" degrees");
+        }
 
         // Resent by serviceResends() until STAGE2_AXIS_ACK arrives.
         sendStage2Axis(bead, index);
