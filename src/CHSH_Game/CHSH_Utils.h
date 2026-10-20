@@ -553,10 +553,29 @@ namespace ChshUtils
         Qbead::Axis &outAxis,
         bool &outLocked)
     {
+        // Qbead::wasTapped() copies the raw sample with the axis
+        // permutation (ix, iy, iz) but WITHOUT the sign flips (sx, sy, sz)
+        // that readIMU() applies to x/y/z, rx/ry/rz and the gravity
+        // estimate. With QB_SY = QB_SZ = 1 this maps (x, y, z) to
+        // (x, -y, -z): the locked axis lands in the opposite hemisphere
+        // of the live preview. Apply the same signs here.
+        //
+        // If your fork already applies the signs inside wasTapped(),
+        // set CHSH_TAP_SIGN_FIX to 0.
+#ifndef CHSH_TAP_SIGN_FIX
+#define CHSH_TAP_SIGN_FIX 1
+#endif
+#if CHSH_TAP_SIGN_FIX
+        Qbead::Axis tappedAxis = {
+            (bead.sx ? -1.f : 1.f) * bead.x_whentapped,
+            (bead.sy ? -1.f : 1.f) * bead.y_whentapped,
+            (bead.sz ? -1.f : 1.f) * bead.z_whentapped};
+#else
         Qbead::Axis tappedAxis = {
             bead.x_whentapped,
             bead.y_whentapped,
             bead.z_whentapped};
+#endif
 
         if (!Qbead::normalise(tappedAxis))
         {
@@ -579,6 +598,17 @@ namespace ChshUtils
         Serial.print(thetaDeg);
         Serial.print(", phi = ");
         Serial.println(phiDeg);
+
+        // Sanity check: the locked axis should be close to what the
+        // preview showed. ~180 deg here means the sign fix is wrong
+        // for your fork (toggle CHSH_TAP_SIGN_FIX).
+        const float previewDot = Qbead::dotProduct(
+            outAxis,
+            ChshUtils::previewAxisFor(bead));
+
+        Serial.print("[LOCK] Angle to live preview = ");
+        Serial.print(acosf(Qbead::clampUnit(previewDot)) * RAD_TO_DEG, 1);
+        Serial.println(" degrees");
 
         return true;
     }
@@ -671,14 +701,26 @@ namespace ChshUtils
         // Stage-1 outcome stays on the sphere as a reference.
         bead.displayCurrentStatesStatic();
 
+        // Axis 0 (input 0): yellow once locked.
+        if (localLocked)
+        {
+            ChshUtils::addAxisOn(
+                bead,
+                localAxis,
+                Qbead::color(210, 207, 2));
+        }
+
+        // Axis 1 (input 1): orange once locked.
         if (secondLocalLocked)
         {
             ChshUtils::addAxisOn(
                 bead,
                 secondLocalAxis,
-                Qbead::color(210, 207, 2));
+                Qbead::color(200, 80, 0));
         }
-        else
+
+        // Live preview while something is still to be chosen.
+        if (!localLocked || !secondLocalLocked)
         {
             ChshUtils::addAxisOn(
                 bead,
@@ -693,20 +735,36 @@ namespace ChshUtils
     // Stage-2 messages
     // -------------------------------------------------------------------------
 
-    inline uint32_t stage2Value(uint32_t code)
+    inline uint32_t stage2Value(uint32_t code, uint8_t index = 0)
     {
-        return code | ((uint32_t)BEAD_ID << STAGE2_ROLE_SHIFT);
+        return code |
+               ((uint32_t)BEAD_ID << STAGE2_ROLE_SHIFT) |
+               ((uint32_t)(index & 1U) << STAGE2_INDEX_SHIFT);
     }
 
-    inline void sendSecondAxis(Qbead::Qbead &bead)
+    // index 0 -> localAxis, index 1 -> secondLocalAxis
+    inline void sendStage2Axis(Qbead::Qbead &bead, uint8_t index)
     {
         ChshComms::sendAxisMessage(
             BLEManager::CommandType::ChshSimulating,
-            stage2Value(STAGE2_AXIS),
-            secondLocalAxis,
+            stage2Value(STAGE2_AXIS, index),
+            index == 0 ? localAxis : secondLocalAxis,
             bead);
 
         ChshStage::lastSendMs = millis();
+    }
+
+    inline void resetSimulation()
+    {
+        simStarted = false;
+        simDone = false;
+
+        rounds = 0;
+        qWins = 0;
+        cWins = 0;
+
+        runStart = 0;
+        fadeStartTime = 0;
     }
 
     // announce = true on the bead that was shaken,
@@ -716,21 +774,22 @@ namespace ChshUtils
         stage = ChshStage::Stage::AutomatedChoosing;
 
         bead.clearStates();
+
+        // Stage 2: both axes are chosen again.
         localLocked = false;
         remoteLocked = false;
+        localAxis = {0.f, 0.f, 1.f};
 
         secondLocalLocked = false;
         secondLocalAxis = {0.f, 0.f, 1.f};
 
         remoteSecondLocked = false;
         remoteSecondAxis = {0.f, 0.f, 1.f};
+
+        firstAxisAcked = false;
         secondAxisAcked = false;
 
-        simStarted = false;
-        simDone = false;
-        simRounds = 0;
-        simWins = 0;
-        simExpected = 0.f;
+        resetSimulation();
 
         stage2EnteredMs = millis();
         stage2AnnouncePending = announce;
@@ -757,25 +816,47 @@ namespace ChshUtils
                 ? "[STAGE2] Shake detected; entering stage 2."
                 : "[STAGE2] Peer entered stage 2; following.");
 
-        Serial.println("[STAGE2] Choose your second axis, then tap.");
+        Serial.println("[STAGE2] Tap to lock axis for input 0, then for input 1.");
 
         drawSecondStage(bead);
     }
 
-    inline void lockSecondAxis(Qbead::Qbead &bead)
+    // Stage-2 lock. Does NOT use the stage-1 lockLocalAxis(): that one
+    // sends ChshAxisLocked (ignored by Alice outside Choosing), may call
+    // chooseFirst() and draws the stage-1 screen.
+    inline void lockStage2Axis(Qbead::Qbead &bead)
     {
-        if (!lockingLocalAxis(bead, secondLocalAxis, secondLocalLocked))
+        const uint8_t index = localLocked ? 1 : 0;
+
+        bool ok = index == 0
+                      ? lockingLocalAxis(bead, localAxis, localLocked)
+                      : lockingLocalAxis(bead, secondLocalAxis, secondLocalLocked);
+
+        if (!ok)
             return;
 
-        Serial.println("[STAGE2] Second axis locked; sending to peer.");
+        Serial.print("[STAGE2] Axis for input ");
+        Serial.print(index);
+        Serial.println(" locked; sending to peer.");
 
         // Resent by serviceResends() until STAGE2_AXIS_ACK arrives.
-        sendSecondAxis(bead);
+        sendStage2Axis(bead, index);
 
-        // Simulating = "locked, waiting for / running the simulation".
-        stage = ChshStage::Stage::Simulating;
+        // Simulating = "both local axes locked, waiting for the peer,
+        // then running the simulation".
+        if (index == 1)
+            stage = ChshStage::Stage::Simulating;
 
         drawSecondStage(bead);
+    }
+
+    // True once both beads know all four axes AND each knows the other
+    // received its axes. Both beads then start within one round trip.
+    inline bool simulationReady()
+    {
+        return localLocked && secondLocalLocked &&
+               remoteLocked && remoteSecondLocked &&
+               firstAxisAcked && secondAxisAcked;
     }
 
     // -------------------------------------------------------------------------
@@ -797,47 +878,48 @@ namespace ChshUtils
 
     inline uint32_t simSuccessColor()
     {
-        // Alice / quantum: cyan. Bob / classical: orange.
         return BEAD_ID == 0
-                   ? Qbead::color(0, 90, 120)
-                   : Qbead::color(140, 60, 0);
+                   ? Qbead::color(100, 100, 0)
+                   : Qbead::color(0, 100, 0);
     }
 
     inline uint32_t simFailColor()
     {
         return BEAD_ID == 0
                    ? Qbead::color(100, 0, 0)
-                   : Qbead::color(0, 100, 0);
+                   : Qbead::color(100, 0, 0);
     }
 
     inline void printSimSummary()
     {
-        const float rate =
-            simRounds == 0 ? 0.f : (float)simWins / (float)simRounds;
+        const float qRate = rounds == 0 ? 0.f : (float)qWins / (float)rounds;
+        const float cRate = rounds == 0 ? 0.f : (float)cWins / (float)rounds;
 
-        Serial.print(
-            BEAD_ID == 0
-                ? "[SIM] Quantum (Alice): "
-                : "[SIM] Classical (Bob): ");
-        Serial.print(simWins);
-        Serial.print("/");
-        Serial.print(simRounds);
-        Serial.print(" = ");
-        Serial.print(100.f * rate, 2);
-        Serial.println("%");
+        Serial.print("[SIM] Rounds: ");
+        Serial.println(rounds);
 
-        Serial.print("[SIM] Expected: ");
-        Serial.print(100.f * simExpected, 2);
-        Serial.println("%");
+        Serial.print("[SIM] Quantum:   ");
+        Serial.print(qWins);
+        Serial.print(" wins = ");
+        Serial.print(100.f * qRate, 2);
+        Serial.print("%  (expected ");
+        Serial.print(100.f * qLimit, 2);
+        Serial.println("%)");
+
+        Serial.print("[SIM] Classical: ");
+        Serial.print(cWins);
+        Serial.print(" wins = ");
+        Serial.print(100.f * cRate, 2);
+        Serial.println("%  (expected 75.00%)");
 
         // Win probability p relates to the CHSH value by S = 8 (p - 1/2).
-        Serial.print("[SIM] S = 8(p - 1/2) = ");
-        Serial.println(8.f * (rate - 0.5f), 3);
+        Serial.print("[SIM] S_quantum = ");
+        Serial.println(8.f * (qRate - 0.5f), 3);
 
         Serial.println("[SIM] Classical bound 75% (S = 2), Tsirelson 85.36% (S = 2.828).");
     }
 
-    void playRound(bool &qWin, bool &cWin)
+    inline void playRound(bool &qWin, bool &cWin)
     { // same (x,y) for both strategies
         uint32_t r = Qbead::updateRNG();
         // Xorshift's lowest bits are its weakest. Take highest bits
@@ -853,7 +935,7 @@ namespace ChshUtils
     }
 
     // TODO: Normalize the four vectors before building Strategy, or add a debug assert that ∣E∣≤1∣E∣≤1
-    void computeProbabilityFromStrategy(const CorrelationDiag &T, const Strategy &s)
+    inline void computeProbabilityFromStrategy(const CorrelationDiag &T, const Strategy &s)
     { // axes must be normalized
         float sum = 0;
         for (int x = 0; x < 2; x++)

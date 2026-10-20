@@ -31,11 +31,11 @@ void startRound()
 
     secondLocalLocked = false;
     remoteSecondLocked = false;
+    firstAxisAcked = false;
     secondAxisAcked = false;
     stage2AnnouncePending = false;
 
-    simStarted = false;
-    simDone = false;
+    ChshUtils::resetSimulation();
 
     localInput =
         USE_RANDOM_INPUTS ? (uint8_t)random(2) : 0;
@@ -215,74 +215,97 @@ void loop()
         const bool stage2TapAllowed =
             (uint32_t)(now - stage2EnteredMs) >= STAGE2_TAP_GUARD_MS;
 
-        if (acceptedTap && !localLocked)
-            ChshUtils::lockLocalAxis(bead);
-        else if (acceptedTap && stage2TapAllowed && !secondLocalLocked)
-            ChshUtils::lockSecondAxis(bead);
+        // Guard applies to BOTH taps: the shake fires the tap interrupt,
+        // which previously locked the first axis instantly.
+        if (acceptedTap && stage2TapAllowed)
+            ChshUtils::lockStage2Axis(bead);
     }
     else if (stage == ChshStage::Stage::Simulating)
     {
-        // Wait until both second axes are known, then:
-        //   Alice -> quantum CHSH with all four axes
-        //   Bob   -> classical a = b = 0 strategy (75%)
-        // TODO swap this to the simulation code
-        if (!simStarted && secondLocalLocked && remoteSecondLocked)
+        // Start only when both beads have all four axes and both know
+        // the other has them, so they start together.
+        //   Alice shows the quantum result, Bob the classical (75%) one.
+        if (!simStarted && ChshUtils::simulationReady())
         {
+            // Same strategy on both beads: a = Alice's axes, b = Bob's.
+            const Qbead::Axis &a0 = BEAD_ID == 0 ? localAxis : remoteAxis;
+            const Qbead::Axis &a1 = BEAD_ID == 0 ? secondLocalAxis : remoteSecondAxis;
+            const Qbead::Axis &b0 = BEAD_ID == 0 ? remoteAxis : localAxis;
+            const Qbead::Axis &b1 = BEAD_ID == 0 ? remoteSecondAxis : secondLocalAxis;
+
             strategy = {
-                {BlochVector(localAxis.x, localAxis.y, localAxis.z),
-                 BlochVector(secondLocalAxis.x, secondLocalAxis.y, secondLocalAxis.z)},
-                {BlochVector(remoteAxis.x, remoteAxis.y, remoteAxis.z),
-                 BlochVector(remoteSecondAxis.x, remoteSecondAxis.y, remoteSecondAxis.z)}};
-                
+                {BlochVector(a0.x, a0.y, a0.z),
+                 BlochVector(a1.x, a1.y, a1.z)},
+                {BlochVector(b0.x, b0.y, b0.z),
+                 BlochVector(b1.x, b1.y, b1.z)}};
+
             ChshUtils::computeProbabilityFromStrategy(PHI_PLUS, strategy);
+
+            Serial.print("[SIM] Expected quantum win rate: ");
+            Serial.print(100.f * qLimit, 2);
+            Serial.println("%");
+
+            rounds = 0;
+            qWins = 0;
+            cWins = 0;
+            simDone = false;
+
             runStart = millis();
-            fadeStartTime = millis();
+            fadeStartTime = runStart;
             simStarted = true;
         }
-        if (rounds < N_TOTAL)
+
+        // Nothing below may run before the start: with runStart == 0 the
+        // schedule below thinks RUN_MS has long passed and plays all
+        // N_TOTAL rounds in one loop() pass (instant result, using qP
+        // from the previous run or zeros).
+        if (simStarted)
         {
-            uint32_t elapsed = millis() - runStart;
-            uint32_t target = (elapsed >= RUN_MS) ? N_TOTAL
-                                                  : (uint32_t)((uint64_t)N_TOTAL * elapsed / RUN_MS);
-            while (rounds < target)
-            { // catch up to the schedule
-                bool qWin, cWin;
-                ChshUtils::playRound(qWin, cWin);
-                qWins += qWin;
-                cWins += cWin;
-                rounds++;
-            }
-        }
-        else
-        {
-            if (!simDone)
+            if (rounds < N_TOTAL)
             {
-                Serial.printf("qWins Total: %lu\n", (ulong)qWins);
-                Serial.printf("qWin rate: %.2f%%\n", 100.0f * qWins / N_TOTAL);
-                Serial.printf("cWins Total: %lu\n", (ulong)cWins);
-                Serial.printf("cWin rate: %.2f%%\n", 100.0f * cWins / N_TOTAL);
-                simDone = !simDone;
+                const uint32_t elapsed = millis() - runStart;
+                const uint32_t target =
+                    (elapsed >= RUN_MS)
+                        ? N_TOTAL
+                        : (uint32_t)((uint64_t)N_TOTAL * elapsed / RUN_MS);
+
+                while (rounds < target)
+                { // catch up to the schedule
+                    bool qWin, cWin;
+                    ChshUtils::playRound(qWin, cWin);
+                    qWins += qWin;
+                    cWins += cWin;
+                    rounds++;
+                }
             }
+            else if (!simDone)
+            {
+                ChshUtils::printSimSummary();
+                Serial.println("[SIM] Done. Tap to return to idle.");
+                simDone = true;
+            }
+
+            bead.clear();
+            if (BEAD_ID == 1)
+            {
+                bead.prMode.showDualLiquidFill(cWins, rounds - cWins, N_TOTAL, ChshUtils::simSuccessColor(), ChshUtils::simFailColor());
+            }
+            else
+            {
+                bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL, ChshUtils::simSuccessColor(), ChshUtils::simFailColor());
+            }
+            // Th must be after initial draw
+            bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
+            bead.show();
         }
 
-        bead.clear();
-        if (BEAD_ID == 1)
-        {
-            bead.prMode.showDualLiquidFill(cWins, rounds - cWins, N_TOTAL, ChshUtils::simSuccessColor(), ChshUtils::simFailColor());
-        }
-        else
-        {
-            bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL, ChshUtils::simSuccessColor(), ChshUtils::simFailColor());
-        }
-        // Th must be after initial draw
-        bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
-        bead.show();
-        // Leave only when finished AND the peer has our axis,
+        // Leave only when finished AND the peer has our axes,
         // otherwise the peer would wait forever.
-        if (acceptedTap && simDone && secondAxisAcked)
+        if (acceptedTap && simDone && firstAxisAcked && secondAxisAcked)
         {
             stage = ChshStage::Stage::Idle;
             stage2AnnouncePending = false;
+            ChshUtils::resetSimulation();
             bead.clearStates();
             ChshUtils::showIdle(bead);
             Serial.println("[STAGE2] Back to idle; entangle again to restart.");

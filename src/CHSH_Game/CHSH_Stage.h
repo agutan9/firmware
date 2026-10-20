@@ -47,20 +47,19 @@ namespace ChshStage
     // bits 0..2: message code (below)
     // bit  3:    sender's role (BEAD_ID)
     //
-    // STAGE2_AXIS carries the sender's second axis in theta/phi.
+    // bit  4:    axis index for STAGE2_AXIS / STAGE2_AXIS_ACK
+    //            (0 = first stage-2 axis, 1 = second stage-2 axis)
+    //
+    // STAGE2_AXIS carries the sender's axis in theta/phi.
     static constexpr uint32_t STAGE2_ENTER = 1;     // "go to stage 2"
     static constexpr uint32_t STAGE2_ENTER_ACK = 2; // "I am in stage 2"
-    static constexpr uint32_t STAGE2_AXIS = 3;      // "my second axis"
-    static constexpr uint32_t STAGE2_AXIS_ACK = 4;  // "got your second axis"
+    static constexpr uint32_t STAGE2_AXIS = 3;      // "my axis #index"
+    static constexpr uint32_t STAGE2_AXIS_ACK = 4;  // "got your axis #index"
 
     static constexpr uint32_t STAGE2_CODE_MASK = 0x7UL;
     static constexpr uint8_t STAGE2_ROLE_SHIFT = 3;
-
-    // Stage-2 simulation.
-    // Alice: quantum CHSH with her two axes and Bob's two axes.
-    // Bob:   classical optimal strategy (a = b = 0), wins 75%.
-    static constexpr uint32_t SIM_ROUNDS = 2000;
-    static constexpr uint16_t SIM_BATCH = 25; // rounds per loop() pass
+    static constexpr uint8_t STAGE2_INDEX_SHIFT = 4;
+    static constexpr uint8_t STAGE2_VALUE_BITS = 5; // anything above is invalid
 
     // true:
     // Generate local random inputs.
@@ -71,7 +70,7 @@ namespace ChshStage
     static constexpr bool USE_RANDOM_INPUTS = true;
     const uint8_t THRESHOLD_BAND = (uint8_t)(0.75f * QB_NBANDS);
     constexpr uint32_t N_TOTAL = 5000;
-    constexpr uint32_t RUN_MS = 50000; // total animation time
+    constexpr uint32_t RUN_MS = 10000; // total animation time
 
     uint32_t runStart = 0;
     uint32_t rounds = 0, qWins = 0, cWins = 0;
@@ -136,14 +135,12 @@ namespace ChshStage
     // confirmed receiving ours.
     Qbead::Axis remoteSecondAxis = {0.f, 0.f, 1.f};
     bool remoteSecondLocked = false;
-    bool secondAxisAcked = false;
+    bool firstAxisAcked = false;  // peer confirmed our localAxis (stage 2)
+    bool secondAxisAcked = false; // peer confirmed our secondLocalAxis
 
     // Simulation progress.
     bool simStarted = false;
     bool simDone = false;
-    uint32_t simRounds = 0;
-    uint32_t simWins = 0;
-    float simExpected = 0.f; // exact expected win probability
 
     uint32_t roundsPlayed = 0;
     uint32_t roundsWon = 0;
