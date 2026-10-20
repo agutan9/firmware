@@ -455,10 +455,13 @@ namespace ChshComms
             const uint8_t senderRole =
                 (uint8_t)((packet.value >> STAGE2_ROLE_SHIFT) & 1U);
 
+            const uint8_t index =
+                (uint8_t)((packet.value >> STAGE2_INDEX_SHIFT) & 1U);
+
             // Ignore our own echoes / malformed packets.
             if (
                 senderRole != (uint8_t)(BEAD_ID ^ 1U) ||
-                (packet.value >> (STAGE2_ROLE_SHIFT + 1)) != 0)
+                (packet.value >> STAGE2_VALUE_BITS) != 0)
             {
                 return;
             }
@@ -506,7 +509,7 @@ namespace ChshComms
                 {
                     ChshComms::sendMessage(
                         Command::ChshSimulating,
-                        ChshUtils::stage2Value(STAGE2_AXIS_ACK),
+                        ChshUtils::stage2Value(STAGE2_AXIS_ACK, index),
                         bead);
                     return;
                 }
@@ -526,17 +529,25 @@ namespace ChshComms
                 // The peer sending an axis also confirms our ENTER.
                 stage2AnnouncePending = false;
 
-                if (!remoteSecondLocked)
+                bool &remoteFlag =
+                    index == 0 ? remoteLocked : remoteSecondLocked;
+
+                Qbead::Axis &remoteSlot =
+                    index == 0 ? remoteAxis : remoteSecondAxis;
+
+                if (!remoteFlag)
                 {
                     Qbead::Axis decoded;
 
                     if (!ChshComms::axisFromPacket(packet, decoded))
                         return;
 
-                    remoteSecondAxis = decoded;
-                    remoteSecondLocked = true;
+                    remoteSlot = decoded;
+                    remoteFlag = true;
 
-                    Serial.print("[STAGE2] Peer's second axis: theta = ");
+                    Serial.print("[STAGE2] Peer's axis for input ");
+                    Serial.print(index);
+                    Serial.print(": theta = ");
                     Serial.print(packet.theta);
                     Serial.print(", phi = ");
                     Serial.println(packet.phi);
@@ -545,7 +556,7 @@ namespace ChshComms
                 // Always acknowledge, also for duplicates.
                 ChshComms::sendMessage(
                     Command::ChshSimulating,
-                    ChshUtils::stage2Value(STAGE2_AXIS_ACK),
+                    ChshUtils::stage2Value(STAGE2_AXIS_ACK, index),
                     bead);
 
                 return;
@@ -553,10 +564,18 @@ namespace ChshComms
 
             case STAGE2_AXIS_ACK:
             {
-                if (inStage2 && secondLocalLocked && !secondAxisAcked)
+                if (!inStage2)
+                    return;
+
+                if (index == 0 && localLocked && !firstAxisAcked)
+                {
+                    firstAxisAcked = true;
+                    Serial.println("[STAGE2] Peer received our axis for input 0.");
+                }
+                else if (index == 1 && secondLocalLocked && !secondAxisAcked)
                 {
                     secondAxisAcked = true;
-                    Serial.println("[STAGE2] Peer received our second axis.");
+                    Serial.println("[STAGE2] Peer received our axis for input 1.");
                 }
 
                 return;
@@ -610,10 +629,14 @@ namespace ChshComms
             stage == ChshStage::Stage::AutomatedChoosing ||
             stage == ChshStage::Stage::Simulating)
         {
-            if (secondLocalLocked && !secondAxisAcked)
+            // Our axes also tell the peer we are in stage 2.
+            if (localLocked && !firstAxisAcked)
             {
-                // Our axis also tells the peer we are in stage 2.
-                ChshUtils::sendSecondAxis(bead);
+                ChshUtils::sendStage2Axis(bead, 0);
+            }
+            else if (secondLocalLocked && !secondAxisAcked)
+            {
+                ChshUtils::sendStage2Axis(bead, 1);
             }
             else if (stage2AnnouncePending)
             {
