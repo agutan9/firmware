@@ -715,6 +715,10 @@ namespace ChshUtils
     {
         stage = ChshStage::Stage::AutomatedChoosing;
 
+        bead.clearStates();
+        localLocked = false;
+        remoteLocked = false;
+
         secondLocalLocked = false;
         secondLocalAxis = {0.f, 0.f, 1.f};
 
@@ -786,92 +790,24 @@ namespace ChshUtils
     //          B[1-remoteInput]= remoteSecondAxis (stage 2)
     //
     // Only Alice needs all four. Bob's classical strategy needs none.
-
-    inline void aliceSettings(Qbead::Axis A[2], Qbead::Axis B[2])
-    {
-        A[localInput & 1U] = localAxis;
-        A[(localInput & 1U) ^ 1U] = secondLocalAxis;
-
-        B[remoteInput & 1U] = remoteAxis;
-        B[(remoteInput & 1U) ^ 1U] = remoteSecondAxis;
-    }
-
     inline float randomUnit()
     {
         return random(1000000L) / 1000000.f;
     }
 
-    // Exact win probability of the quantum strategy for the four axes,
-    // averaged over uniformly random inputs x, y.
-    inline float quantumExpectedWin(const Qbead::Axis A[2], const Qbead::Axis B[2])
-    {
-        float sum = 0.f;
-
-        for (uint8_t x = 0; x < 2; ++x)
-        {
-            for (uint8_t y = 0; y < 2; ++y)
-            {
-                const float pSame =
-                    sameOutcomeProbability(A[x], B[y]);
-
-                sum += (x & y) == 0 ? pSame : 1.f - pSame;
-            }
-        }
-
-        return 0.25f * sum;
-    }
-
-    // One round of the quantum game on |Phi+>. Returns true on a win.
-    inline bool quantumRound(const Qbead::Axis A[2], const Qbead::Axis B[2])
-    {
-        const uint8_t x = (uint8_t)random(2);
-        const uint8_t y = (uint8_t)random(2);
-
-        const float pSame =
-            sameOutcomeProbability(A[x], B[y]);
-
-        const uint8_t a = (uint8_t)random(2);
-        const uint8_t b = randomUnit() < pSame ? a : (a ^ 1U);
-
-        return (a ^ b) == (x & y);
-    }
-
-    // One round of the optimal deterministic classical strategy:
-    // both players always answer 0. Wins unless x = y = 1, i.e. 75%.
-    inline bool classicalRound()
-    {
-        const uint8_t x = (uint8_t)random(2);
-        const uint8_t y = (uint8_t)random(2);
-
-        const uint8_t a = 0;
-        const uint8_t b = 0;
-
-        return (a ^ b) == (x & y);
-    }
-
-    // Win-rate bar: lights the fraction of pixels equal to the win rate.
-    inline void drawWinRate(Qbead::Qbead &bead, float rate, uint32_t pixelColor)
-    {
-        bead.clear();
-
-        const uint16_t n = bead.pixels.numPixels();
-        uint16_t lit = (uint16_t)lroundf(Qbead::clampUnit(rate) * n);
-
-        if (lit > n)
-            lit = n;
-
-        for (uint16_t i = 0; i < lit; ++i)
-            bead.pixels.setPixelColor(i, pixelColor);
-
-        bead.show();
-    }
-
-    inline uint32_t simColor()
+    inline uint32_t simSuccessColor()
     {
         // Alice / quantum: cyan. Bob / classical: orange.
         return BEAD_ID == 0
                    ? Qbead::color(0, 90, 120)
                    : Qbead::color(140, 60, 0);
+    }
+
+    inline uint32_t simFailColor()
+    {
+        return BEAD_ID == 0
+                   ? Qbead::color(100, 0, 0)
+                   : Qbead::color(0, 100, 0);
     }
 
     inline void printSimSummary()
@@ -901,89 +837,35 @@ namespace ChshUtils
         Serial.println("[SIM] Classical bound 75% (S = 2), Tsirelson 85.36% (S = 2.828).");
     }
 
-    inline void startSimulation(Qbead::Qbead &bead)
-    {
-        simStarted = true;
-        simDone = false;
-        simRounds = 0;
-        simWins = 0;
-
-        if (BEAD_ID == 0)
-        {
-            Qbead::Axis A[2];
-            Qbead::Axis B[2];
-            aliceSettings(A, B);
-
-            simExpected = quantumExpectedWin(A, B);
-
-            Serial.println("[SIM] Both second axes known; running quantum CHSH.");
-
-            for (uint8_t i = 0; i < 2; ++i)
-            {
-                float t, ph;
-
-                Qbead::axisAngles(A[i], t, ph);
-                Serial.print("[SIM] A");
-                Serial.print(i);
-                Serial.print(": theta = ");
-                Serial.print(t);
-                Serial.print(", phi = ");
-                Serial.println(ph);
-
-                Qbead::axisAngles(B[i], t, ph);
-                Serial.print("[SIM] B");
-                Serial.print(i);
-                Serial.print(": theta = ");
-                Serial.print(t);
-                Serial.print(", phi = ");
-                Serial.println(ph);
-            }
-        }
-        else
-        {
-            simExpected = 0.75f;
-
-            Serial.println("[SIM] Both second axes known; running classical CHSH (a = b = 0).");
-        }
-
-        drawWinRate(bead, 0.f, simColor());
+    void playRound(bool &qWin, bool &cWin)
+    { // same (x,y) for both strategies
+        uint32_t r = Qbead::updateRNG();
+        // Xorshift's lowest bits are its weakest. Take highest bits
+        int x = (r >> 31) & 1, y = (r >> 30) & 1;
+        // This gives a 22-bit uniform, with resolution of about 2.4×10−72.4×10−7
+        qWin = ((r & 0x3FFFFFu) * (1.0f / 4194304.0f)) < qP[x][y]; // 22 low-ish bits
+        cWin = !(x & y);                                           // always answer 0
     }
 
-    // Runs SIM_BATCH rounds per call so loop() stays responsive
-    // (BLE packets, resends and the display keep being serviced).
-    inline void stepSimulation(Qbead::Qbead &bead)
+    static inline float corr_E(const CorrelationDiag &T, const Qbead::BlochVector &a, const Qbead::BlochVector &b)
     {
-        if (!simStarted || simDone)
-            return;
+        return a.x * T.x_corr * b.x + a.y * T.y_corr * b.y + a.z * T.z_corr * b.z;
+    }
 
-        Qbead::Axis A[2];
-        Qbead::Axis B[2];
-
-        if (BEAD_ID == 0)
-            aliceSettings(A, B);
-
-        for (uint16_t i = 0; i < SIM_BATCH && simRounds < SIM_ROUNDS; ++i)
-        {
-            const bool won =
-                BEAD_ID == 0 ? quantumRound(A, B) : classicalRound();
-
-            ++simRounds;
-
-            if (won)
-                ++simWins;
-        }
-
-        drawWinRate(
-            bead,
-            (float)simWins / (float)simRounds,
-            simColor());
-
-        if (simRounds >= SIM_ROUNDS)
-        {
-            simDone = true;
-            printSimSummary();
-            Serial.println("[SIM] Done. Tap to return to idle.");
-        }
+    // TODO: Normalize the four vectors before building Strategy, or add a debug assert that ∣E∣≤1∣E∣≤1
+    void computeProbabilityFromStrategy(const CorrelationDiag &T, const Strategy &s)
+    { // axes must be normalized
+        float sum = 0;
+        for (int x = 0; x < 2; x++)
+            for (int y = 0; y < 2; y++)
+            {
+                float w = (x & y) ? -1.f : 1.f;
+                qE[x][y] = corr_E(T, s.a[x], s.b[y]);
+                qP[x][y] = 0.5f * (1.f + w * qE[x][y]);
+                sum += qP[x][y];
+            }
+        // Long-run rate 1/4 ∑ p_{xy} = 1/2 + S/8
+        qLimit = 0.25f * sum; // = 1/2 + S/8
     }
 }
 
