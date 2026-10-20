@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <Qbead.h>
 #include <internal/QbeadUtils.h>
+#include <internal/BlochVector.h>
 #include <math.h>
 
 namespace ChshStage
@@ -68,6 +69,13 @@ namespace ChshStage
     // false:
     // Always demonstrate the 45-degree, equal-outcome case.
     static constexpr bool USE_RANDOM_INPUTS = true;
+    const uint8_t THRESHOLD_BAND = (uint8_t)(0.75f * QB_NBANDS);
+    constexpr uint32_t N_TOTAL = 5000;
+    constexpr uint32_t RUN_MS = 50000; // total animation time
+
+    uint32_t runStart = 0;
+    uint32_t rounds = 0, qWins = 0, cWins = 0;
+    uint32_t fadeStartTime = 0;
 
     // -----------------------------------------------------------------------------
     // Application state
@@ -139,6 +147,24 @@ namespace ChshStage
 
     uint32_t roundsPlayed = 0;
     uint32_t roundsWon = 0;
+
+    struct Strategy
+    {
+        Qbead::BlochVector a[2];
+        Qbead::BlochVector b[2];
+    };
+
+    struct CorrelationDiag
+    {
+        float x_corr, y_corr, z_corr;
+    };
+    const CorrelationDiag PHI_PLUS{1, -1, 1}, PHI_MINUS{-1, 1, 1}, PSI_PLUS{1, 1, -1}, PSI_MINUS{-1, -1, -1};
+
+    float qE[2][2]; // quantum correlations (debug, method B)
+    float qP[2][2]; // quantum win probability per (x,y)
+    float qLimit;   // long-run quantum win rate
+
+    Strategy strategy = {};
 }
 
 #endif // CHSH_STAGE_H

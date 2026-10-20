@@ -215,7 +215,9 @@ void loop()
         const bool stage2TapAllowed =
             (uint32_t)(now - stage2EnteredMs) >= STAGE2_TAP_GUARD_MS;
 
-        if (acceptedTap && stage2TapAllowed && !secondLocalLocked)
+        if (acceptedTap && !localLocked)
+            ChshUtils::lockLocalAxis(bead);
+        else if (acceptedTap && stage2TapAllowed && !secondLocalLocked)
             ChshUtils::lockSecondAxis(bead);
     }
     else if (stage == ChshStage::Stage::Simulating)
@@ -225,10 +227,56 @@ void loop()
         //   Bob   -> classical a = b = 0 strategy (75%)
         // TODO swap this to the simulation code
         if (!simStarted && secondLocalLocked && remoteSecondLocked)
-            ChshUtils::startSimulation(bead);
+        {
+            strategy = {
+                {BlochVector(localAxis.x, localAxis.y, localAxis.z),
+                 BlochVector(secondLocalAxis.x, secondLocalAxis.y, secondLocalAxis.z)},
+                {BlochVector(remoteAxis.x, remoteAxis.y, remoteAxis.z),
+                 BlochVector(remoteSecondAxis.x, remoteSecondAxis.y, remoteSecondAxis.z)}};
+                
+            ChshUtils::computeProbabilityFromStrategy(PHI_PLUS, strategy);
+            runStart = millis();
+            fadeStartTime = millis();
+            simStarted = true;
+        }
+        if (rounds < N_TOTAL)
+        {
+            uint32_t elapsed = millis() - runStart;
+            uint32_t target = (elapsed >= RUN_MS) ? N_TOTAL
+                                                  : (uint32_t)((uint64_t)N_TOTAL * elapsed / RUN_MS);
+            while (rounds < target)
+            { // catch up to the schedule
+                bool qWin, cWin;
+                ChshUtils::playRound(qWin, cWin);
+                qWins += qWin;
+                cWins += cWin;
+                rounds++;
+            }
+        }
+        else
+        {
+            if (!simDone)
+            {
+                Serial.printf("qWins Total: %lu\n", (ulong)qWins);
+                Serial.printf("qWin rate: %.2f%%\n", 100.0f * qWins / N_TOTAL);
+                Serial.printf("cWins Total: %lu\n", (ulong)cWins);
+                Serial.printf("cWin rate: %.2f%%\n", 100.0f * cWins / N_TOTAL);
+                simDone = !simDone;
+            }
+        }
 
-        ChshUtils::stepSimulation(bead);
-
+        bead.clear();
+        if (BEAD_ID == 1)
+        {
+            bead.prMode.showDualLiquidFill(cWins, rounds - cWins, N_TOTAL, ChshUtils::simSuccessColor(), ChshUtils::simFailColor());
+        }
+        else
+        {
+            bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL, ChshUtils::simSuccessColor(), ChshUtils::simFailColor());
+        }
+        // Th must be after initial draw
+        bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
+        bead.show();
         // Leave only when finished AND the peer has our axis,
         // otherwise the peer would wait forever.
         if (acceptedTap && simDone && secondAxisAcked)
