@@ -294,8 +294,12 @@ void loop()
             {
                 bead.prMode.showDualLiquidFill(qWins, rounds - qWins, N_TOTAL, ChshUtils::simSuccessColor(), ChshUtils::simFailColor());
             }
-            // Th must be after initial draw
-            bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
+            // This must be after initial draw
+            // TODO: Because of the inversion issue being resolved in the setBandColour it is now
+            // very jankily fixed on this side at this getLegPixelColor issue.
+            // Otherwise it gets the undercolour of the hemisphere inverted band
+            //bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
+            bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, bead.nsections - THRESHOLD_BAND));
             bead.show();
         }
 
