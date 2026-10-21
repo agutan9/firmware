@@ -198,8 +198,13 @@ namespace Qbead
     }
 
     // TODO: Future | Arbitrary bands like QBEADS
-    void setBandColor(int band, uint32_t color) override
+    // TODO: Handle band inversion issue better
+    void setBandColor(int band, uint32_t color, bool invert = true) override
     {
+      if (invert)
+      {
+        band = nsections - band;
+      }
       if (band == 0 || band == nsections)
       {
         // First and last bands are just the single pixel poles

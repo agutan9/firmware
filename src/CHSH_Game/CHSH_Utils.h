@@ -899,15 +899,15 @@ namespace ChshUtils
     inline uint32_t simSuccessColor()
     {
         return BEAD_ID == 0
-                   ? Qbead::color(100, 100, 0)
-                   : Qbead::color(0, 100, 0);
+                   ? Qbead::color(0, 200, 0)
+                   : Qbead::color(100, 100, 0);
     }
 
     inline uint32_t simFailColor()
     {
         return BEAD_ID == 0
-                   ? Qbead::color(100, 0, 0)
-                   : Qbead::color(100, 0, 0);
+                   ? Qbead::color(200, 0, 0)
+                   : Qbead::color(200, 0, 0);
     }
 
     inline void printSimSummary()

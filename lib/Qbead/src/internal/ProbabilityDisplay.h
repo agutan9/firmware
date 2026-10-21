@@ -6,7 +6,7 @@ namespace Qbead
 {
     // need an interface to decouple circular qbead dependance
     struct BandPainter { 
-        virtual void setBandColor(int band, uint32_t color) = 0;
+        virtual void setBandColor(int band, uint32_t color, bool inversion = true) = 0;
     };
 
     class ProbabilityDisplay
@@ -72,6 +72,7 @@ namespace Qbead
             return currentFillColour;
         }
 
+        // TODO: Better handle color setting
         void showSingleLiquidFill(uint32_t count, uint32_t total)
         {
             if (total == 0 || total < count)
@@ -122,21 +123,25 @@ namespace Qbead
             //    // Only one band at a time can have fill-up gradient
             //    setBandColour(bead, nbands - fullBands - 1, fillColorMap(fillRatio - fullBands));
             //}
-            //float win  = (float)botCount  / total * nbands;   // rises from the south pole
-            //float loss = (float)topCount / total * nbands;   // falls from the north pole
-            float winP = (float)botCount / total;
-            float lossP = (float)topCount / total;
+            
+            // LINEAR
+            float win  = (float)botCount  / total * nbands;   // rises from the south pole
+            float loss = (float)topCount / total * nbands;   // falls from the north pole
+            
+            // AREA
+            //float winP = (float)botCount / total;
+            //float lossP = (float)topCount / total;
             
 
             for (uint8_t b = 0; b < nbands; b++) {
                 
                 // LINEAR
-                //float w = constrain(win  - b,                0.f, 1.f);
-                //float l = constrain(loss - (nbands - 1 - b), 0.f, 1.f);
+                float w = constrain(win  - b,                0.f, 1.f);
+                float l = constrain(loss - (nbands - 1 - b), 0.f, 1.f);
                 
                 // AREA MAPPED
-                float w = bandLevel(winP,  b,             QB_NSECTIONS);
-                float l = bandLevel(lossP, QB_NSECTIONS - b, QB_NSECTIONS);
+                //float w = bandLevel(winP,  b,             QB_NSECTIONS);
+                //float l = bandLevel(lossP, QB_NSECTIONS - b, QB_NSECTIONS);
                 
                 // NO GAMMA
                 //painter.setBandColor(b, addColor(scaleColor(w, color(0, 255, 0)),
