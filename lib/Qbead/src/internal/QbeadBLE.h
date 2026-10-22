@@ -15,6 +15,14 @@ namespace BLEManager
     PreparedVisualizations = 4,
     Entangle = 5,
     Measure = 6,
+    ChshAddressLow = 7,
+    ChshAddressHigh = 8,
+    ChshRoleReady = 9,
+    ChshAxisLocked = 10,
+    ChshFirstSetting = 11,
+    ChshResult = 12,
+    ChshResultAck = 13,
+    ChshSimulating = 14,
   };
 
   struct DataPacket
@@ -98,6 +106,11 @@ namespace BLEManager
 
     BLEClientCharacteristic qBeadColCharClient;
     BLECharacteristic qBeadColCharChar;
+
+    void getAddr(uint8_t localAddress[6])
+    {
+      Bluefruit.getAddr(localAddress);
+    }
 
     bool takePacket(DataPacket &packet)
     {
