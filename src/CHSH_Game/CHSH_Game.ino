@@ -298,7 +298,7 @@ void loop()
             // TODO: Because of the inversion issue being resolved in the setBandColour it is now
             // very jankily fixed on this side at this getLegPixelColor issue.
             // Otherwise it gets the undercolour of the hemisphere inverted band
-            //bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
+            // bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, THRESHOLD_BAND));
             bead.prMode.showThresholdBand(fadeStartTime, bead.getLegPixelColor(0, bead.nsections - THRESHOLD_BAND));
             bead.show();
         }
@@ -307,7 +307,7 @@ void loop()
         // otherwise the peer would wait forever.
         if (acceptedTap && simDone && firstAxisAcked && secondAxisAcked)
         {
-            stage = ChshStage::Stage::Idle;
+            stage = ChshStage::Stage::Collapsed;
             stage2AnnouncePending = false;
             ChshUtils::resetSimulation();
             bead.clearStates();
