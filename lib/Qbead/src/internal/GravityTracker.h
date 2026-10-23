@@ -1,3 +1,9 @@
+/**
+ * @file GravityTracker.h
+ * @brief Gyro/accelerometer fusion that tracks the gravity direction in the sphere frame.
+ *
+ * Implementation lives in GravityTracker.cpp.
+ */
 #ifndef QBEAD_GRAVITY_TRACK_H
 #define QBEAD_GRAVITY_TRACK_H
 
@@ -76,58 +82,15 @@ namespace Qbead
         /**
          * @brief Advances the estimate by one sample.
          *
+         * Steps: invalidate on a sampling gap, (re)seed from a trustworthy accelerometer
+         * sample, predict with the gyro, correct toward the accelerometer weighted by
+         * trust, then renormalise.
+         *
          * @param accelSphere   Acceleration in the sphere frame (3 elements), in g. Unsmoothed.
          * @param gyroSphereDps Bias-corrected angular rate in the sphere frame (3 elements), in degrees/s.
          * @param dtSeconds     Time since the previous sample, in seconds.
          */
-        void update(const float accelSphere[3], const float gyroSphereDps[3], float dtSeconds)
-        {
-            float accelMagnitude = sqrtf(accelSphere[0] * accelSphere[0] +
-                                         accelSphere[1] * accelSphere[1] +
-                                         accelSphere[2] * accelSphere[2]);
-            float accelMagnitudeError = fabsf(accelMagnitude - 1.f); // deviation from 1 g
-
-            // 1. A gap in sampling makes the integrated history unreliable.
-            if (dtSeconds > maxGapSeconds)
-                isInitialised = false;
-
-            // 2. (Re)seed from the accelerometer, but only when it is trustworthy.
-            if (!isInitialised)
-            {
-                if (accelMagnitudeError < seedTrustBand)
-                {
-                    for (int i = 0; i < 3; i++)
-                        gravityEstimate[i] = accelSphere[i] / accelMagnitude;
-                    isInitialised = true;
-                }
-                return; // otherwise keep the stale estimate and wait
-            }
-
-            // 3. Predict: in the sphere frame a world-fixed vector rotates as -omega x gravity.
-            float omegaRadPerSecond[3] = {gyroSphereDps[0] * DEG_TO_RAD,
-                                          gyroSphereDps[1] * DEG_TO_RAD,
-                                          gyroSphereDps[2] * DEG_TO_RAD};
-            float crossProduct[3] = {
-                omegaRadPerSecond[1] * gravityEstimate[2] - omegaRadPerSecond[2] * gravityEstimate[1],
-                omegaRadPerSecond[2] * gravityEstimate[0] - omegaRadPerSecond[0] * gravityEstimate[2],
-                omegaRadPerSecond[0] * gravityEstimate[1] - omegaRadPerSecond[1] * gravityEstimate[0]};
-            for (int i = 0; i < 3; i++)
-                gravityEstimate[i] -= crossProduct[i] * dtSeconds;
-
-            // 4. Correct: pull toward the accelerometer, weighted by how much it can be trusted.
-            float accelTrust = fmaxf(0.f, 1.f - accelMagnitudeError / accelTrustBand); // 1 at 1 g, 0 beyond the band
-            float correctionGain = (dtSeconds / accelCorrectionTimeConstantSeconds) * accelTrust;
-            for (int i = 0; i < 3; i++)
-                gravityEstimate[i] += correctionGain * (accelSphere[i] - gravityEstimate[i]);
-
-            // 5. Renormalise to unit length (guarded against a zero vector).
-            float norm = sqrtf(gravityEstimate[0] * gravityEstimate[0] +
-                               gravityEstimate[1] * gravityEstimate[1] +
-                               gravityEstimate[2] * gravityEstimate[2]);
-            if (norm > 1e-6f)
-                for (int i = 0; i < 3; i++)
-                    gravityEstimate[i] /= norm;
-        }
+        void update(const float accelSphere[3], const float gyroSphereDps[3], float dtSeconds);
     };
 }
-#endif
+#endif // QBEAD_GRAVITY_TRACK_H

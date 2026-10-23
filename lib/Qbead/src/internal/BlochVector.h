@@ -1,3 +1,9 @@
+/**
+ * @file BlochVector.h
+ * @brief Single-qubit state represented as a point on the Bloch sphere.
+ *
+ * Implementations live in BlochVector.cpp.
+ */
 #ifndef BLOCH_VECTOR_H
 #define BLOCH_VECTOR_H
 
@@ -6,118 +12,143 @@
 
 namespace Qbead
 {
+    /**
+     * @brief A unit vector on the Bloch sphere, stored both as angles and as Cartesian components.
+     *
+     * Angles are in degrees: theta in [0, 180] from the +z axis (|0⟩), phi in [0, 360).
+     * The Cartesian components (x, y, z) are kept consistent with the angles by every
+     * constructor and setter.
+     */
     class BlochVector
     {
     public:
-        BlochVector() : theta(0), phi(0), x(0), y(0), z(1) {}
+        /** @brief Constructs the north-pole state |0⟩ (theta = 0, phi = 0, z = 1). */
+        BlochVector();
 
-        BlochVector(const float theta_in, const float phi_in)
-        {
-            const float theta_mod360 = modulo(theta_in, 360);
-            theta = (theta_mod360 < 180) ? theta_mod360 : 360 - theta_mod360;
-            phi = modulo(phi_in + (theta_mod360 > 180) * 180, 360);
-            x = cos_deg(phi_in) * sin_deg(theta_in);
-            y = sin_deg(phi_in) * sin_deg(theta_in);
-            z = cos_deg(theta_in);
-        }
+        /**
+         * @brief Constructs a vector from spherical angles in degrees.
+         *
+         * theta is wrapped into [0, 180]; if it lies in (180, 360) the vector is
+         * reflected through the pole and phi is shifted by 180 degrees. phi is
+         * wrapped into [0, 360).
+         *
+         * @param theta_in Polar angle in degrees (any value).
+         * @param phi_in   Azimuthal angle in degrees (any value).
+         */
+        BlochVector(const float theta_in, const float phi_in);
 
-        BlochVector(const float x_in, const float y_in, const float z_in)
-        {
-            theta = toDegrees(atan2(sqrt(x_in * x_in + y_in * y_in), z_in));
-            phi = modulo(toDegrees(atan2(y_in, x_in)), 360);
-            const float r = sqrt(x_in * x_in + y_in * y_in + z_in * z_in);
-            x = x_in / r;
-            y = y_in / r;
-            z = z_in / r;
-        }
+        /**
+         * @brief Constructs a vector from Cartesian components, normalising to unit length.
+         * @param x_in x component.
+         * @param y_in y component.
+         * @param z_in z component.
+         * @warning A zero vector gives NaN components; no guard is applied.
+         */
+        BlochVector(const float x_in, const float y_in, const float z_in);
 
-        float theta; // in degrees
-        float phi;   // in degrees
-        float x;
-        float y;
-        float z;
+        float theta; /**< Polar angle in degrees, [0, 180]. */
+        float phi;   /**< Azimuthal angle in degrees, [0, 360). */
+        float x;     /**< Unit-vector x component. */
+        float y;     /**< Unit-vector y component. */
+        float z;     /**< Unit-vector z component. */
 
-        BlochVector &operator=(const BlochVector &other)
-        {
-            theta = other.theta;
-            phi = other.phi;
-            x = other.x;
-            y = other.y;
-            z = other.z;
-            return *this;
-        }
+        /**
+         * @brief Copies all angle and Cartesian fields from @p other.
+         * @param other Vector to copy.
+         * @return Reference to this vector.
+         */
+        BlochVector &operator=(const BlochVector &other);
 
-        BlochVector operator-() const
-        {
-            return BlochVector(-x, -y, -z);
-        }
+        /**
+         * @brief Antipodal (orthogonal) state.
+         * @return The vector (-x, -y, -z).
+         */
+        BlochVector operator-() const;
 
-        BlochVector rotatedAround(const BlochVector &axis, const float angle) const
-        {
-            const float axis_x = axis.x;
-            const float axis_y = axis.y;
-            const float axis_z = axis.z;
-            const float dot_product = x * axis_x + y * axis_y + z * axis_z;
-            const float new_x = x * cos_deg(angle) + (axis_y * z - axis_z * y) * sin_deg(angle) + axis_x * dot_product * (1 - cos_deg(angle));
-            const float new_y = y * cos_deg(angle) + (axis_z * x - axis_x * z) * sin_deg(angle) + axis_y * dot_product * (1 - cos_deg(angle));
-            const float new_z = z * cos_deg(angle) + (axis_x * y - axis_y * x) * sin_deg(angle) + axis_z * dot_product * (1 - cos_deg(angle));
+        /**
+         * @brief Returns a copy rotated about an axis (Rodrigues' rotation formula).
+         * @param axis  Rotation axis; must be a unit vector.
+         * @param angle Rotation angle in degrees (right-hand rule).
+         * @return The rotated vector; this vector is unchanged.
+         */
+        BlochVector rotatedAround(const BlochVector &axis, const float angle) const;
 
-            BlochVector result(new_x, new_y, new_z);
-            return result;
-        }
+        /**
+         * @brief Rotates this vector in place about an axis.
+         * @param axis  Rotation axis; must be a unit vector.
+         * @param angle Rotation angle in degrees (right-hand rule).
+         * @return Reference to this vector.
+         */
+        BlochVector &rotateAround(const BlochVector &axis, const float angle);
 
-        BlochVector &rotateAround(const BlochVector &axis, const float angle)
-        {
-            *this = this->rotatedAround(axis, angle);
-            return *this;
-        }
+        /**
+         * @brief Great-circle angle between this vector and @p other.
+         * @param other Other vector.
+         * @return Central angle in degrees, [0, 180].
+         * @todo This is quite suboptimal.
+         */
+        float centralAngle(const BlochVector &other) const;
 
-        float centralAngle(const BlochVector &other) const
-        { // TODO this is quite suboptimal
-            return toDegrees(acos(
-                cos_deg(theta) * cos_deg(other.theta) + sin_deg(theta) * sin_deg(other.theta) * cos_deg(phi - other.phi)));
-        }
+        /**
+         * @brief Absolute value of the inner product between the quantum states (as kets in a Hilbert space) represented by the two Bloch vectors.
+         *
+         * Equal to cos(alpha / 2), where alpha is the central angle between the vectors.
+         *
+         * @param other Other state.
+         * @return |⟨this|other⟩|, in [0, 1].
+         * @todo This is quite suboptimal; maybe rename to innerProductKet.
+         */
+        float innerProductAbs(const BlochVector &other) const;
 
-        // Absolute value of inner product between the quantum states (as kets in a Hilbert space) represented by the two Bloch vectors
-        float innerProductAbs(const BlochVector &other) const
-        { // TODO this is quite suboptimal // maybe rename to innerProductKet
-            float angle = centralAngle(other);
-            float cosval = cos_deg(angle / 2.0f);
-            return cosval;
-        }
+        /**
+         * @brief Inner product between the 3D vectors.
+         * @param other Other vector.
+         * @return Geometric dot product x·x' + y·y' + z·z', in [-1, 1].
+         * @todo This is quite suboptimal.
+         */
+        float innerProductGeom(const BlochVector &other) const;
 
-        // Inner product between the 3D vectors
-        float innerProductGeom(const BlochVector &other) const
-        { // TODO this is quite suboptimal
-            return x * other.x + y * other.y + z * other.z;
-        }
+        /**
+         * @brief Replaces this vector with one built from Cartesian components (normalised).
+         * @param x x component.
+         * @param y y component.
+         * @param z z component.
+         */
+        void setXYZ(const float x, const float y, const float z);
 
-        void setXYZ(const float x, const float y, const float z)
-        {
-            BlochVector new_vector(x, y, z);
-            *this = new_vector;
-        }
-
-        void setAngles(const float theta, const float phi)
-        {
-            BlochVector new_vector(theta, phi);
-            *this = new_vector;
-        }
+        /**
+         * @brief Replaces this vector with one built from spherical angles in degrees.
+         * @param theta Polar angle in degrees.
+         * @param phi   Azimuthal angle in degrees.
+         */
+        void setAngles(const float theta, const float phi);
     };
 
-    float centralAngle(const BlochVector &v, const BlochVector &u)
-    {
-        return v.centralAngle(u);
-    }
+    /**
+     * @brief Great-circle angle between two vectors.
+     * @param v First vector.
+     * @param u Second vector.
+     * @return Central angle in degrees, [0, 180].
+     * @see BlochVector::centralAngle
+     */
+    float centralAngle(const BlochVector &v, const BlochVector &u);
 
-    float innerProductAbs(const BlochVector &v, const BlochVector &u)
-    {
-        return v.innerProductAbs(u);
-    }
+    /**
+     * @brief Absolute ket inner product between two states.
+     * @param v First state.
+     * @param u Second state.
+     * @return |⟨v|u⟩|, in [0, 1].
+     * @see BlochVector::innerProductAbs
+     */
+    float innerProductAbs(const BlochVector &v, const BlochVector &u);
 
-    float innerProductGeom(const BlochVector &v, const BlochVector &u)
-    {
-        return v.innerProductGeom(u);
-    }
+    /**
+     * @brief Geometric dot product between two Bloch vectors.
+     * @param v First vector.
+     * @param u Second vector.
+     * @return v · u, in [-1, 1].
+     * @see BlochVector::innerProductGeom
+     */
+    float innerProductGeom(const BlochVector &v, const BlochVector &u);
 }
-#endif
+#endif // BLOCH_VECTOR_H

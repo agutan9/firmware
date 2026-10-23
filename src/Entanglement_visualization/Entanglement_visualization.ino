@@ -351,7 +351,7 @@ void loop()
         if (c_tap > 25)
         {
             c_tap = 0;
-            bead.ble.sendData(
+            bead.sendData(
                 BLEManager::CommandType::ClearStates,
                 0, 0, 0);
 
@@ -364,7 +364,7 @@ void loop()
             {
                 Serial.println("Selecting visual 4");
                 activateVisual(4);
-                bead.ble.sendData(
+                bead.sendData(
                     BLEManager::CommandType::PreparedVisualizations,
                     4, 0, 0);
             }
@@ -375,7 +375,7 @@ void loop()
             {
                 Serial.println("Selecting visual 3");
                 activateVisual(3);
-                bead.ble.sendData(
+                bead.sendData(
                     BLEManager::CommandType::PreparedVisualizations,
                     3, 0, 0);
             }
@@ -386,7 +386,7 @@ void loop()
             {
                 Serial.println("Selecting visual 2");
                 activateVisual(2);
-                bead.ble.sendData(
+                bead.sendData(
                     BLEManager::CommandType::PreparedVisualizations,
                     2, 0, 0);
             }
@@ -397,7 +397,7 @@ void loop()
             {
                 Serial.println("Selecting visual 1");
                 activateVisual(1);
-                bead.ble.sendData(
+                bead.sendData(
                     BLEManager::CommandType::PreparedVisualizations,
                     1, 0, 0);
             }
