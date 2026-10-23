@@ -1,0 +1,270 @@
+/**
+ * @file QbeadBLE.cpp
+ * @brief Implementation of BLEManager::BLEManager.
+ */
+#include "QbeadBLE.h"
+
+namespace BLEManager
+{
+  BLEManager *BLEManager::instance = nullptr;
+
+  BLEManager::BLEManager()
+      : qBeadClientService(Qbead::QB_UUID_SERVICE),
+        bleservice(Qbead::QB_UUID_SERVICE),
+        qBeadDataClient(Qbead::QB_UUID_DATA_CHAR),
+        qBeadDataChar(Qbead::QB_UUID_DATA_CHAR),
+        qBeadTapClient(Qbead::QB_UUID_TAP_CHAR),
+        qBeadTapChar(Qbead::QB_UUID_TAP_CHAR),
+        qBeadCharAccClient(Qbead::QB_UUID_ACC_CHAR),
+        qBeadCharAccChar(Qbead::QB_UUID_ACC_CHAR),
+        qBeadSphCharClient(Qbead::QB_UUID_SPH_CHAR),
+        qBeadSphCharChar(Qbead::QB_UUID_SPH_CHAR),
+        qBeadColCharClient(Qbead::QB_UUID_COL_CHAR),
+        qBeadColCharChar(Qbead::QB_UUID_COL_CHAR)
+  {
+  }
+
+  void BLEManager::setupPeripheral()
+  {
+    bleservice.begin();
+
+    qBeadDataChar.setProperties(
+        CHR_PROPS_READ |
+        CHR_PROPS_NOTIFY);
+
+    qBeadDataChar.setPermission(
+        SECMODE_OPEN,
+        SECMODE_NO_ACCESS);
+
+    qBeadDataChar.setUserDescriptor("Qbead data");
+    qBeadDataChar.setFixedLen(sizeof(DataPacket));
+    qBeadDataChar.begin();
+
+    DataPacket initial = {CommandType::None, 0, 0, 0};
+    qBeadDataChar.write(&initial, sizeof(initial));
+  }
+
+  void BLEManager::setupCentral()
+  {
+    qBeadClientService.begin();
+
+    qBeadDataClient.setNotifyCallback(data_callback);
+    qBeadDataClient.begin();
+
+    Bluefruit.Central.setConnectCallback(connect_callback);
+    Bluefruit.Central.setDisconnectCallback(disconnect_callback);
+  }
+
+  void BLEManager::getAddr(uint8_t localAddress[6])
+  {
+    Bluefruit.getAddr(localAddress);
+  }
+
+  bool BLEManager::takePacket(DataPacket &packet)
+  {
+    if (lastPacket.type == CommandType::None)
+    {
+      return false;
+    }
+
+    packet = lastPacket;
+    lastPacket = {CommandType::None, 0, 0, 0};
+    return true;
+  }
+
+  bool BLEManager::takeEntangleRequest(uint32_t &receivedAtMs)
+  {
+    if (!entangleRequestPending)
+    {
+      return false;
+    }
+
+    noInterrupts();
+    receivedAtMs = entangleRequestReceivedAtMs;
+    entangleRequestPending = false;
+    interrupts();
+
+    return true;
+  }
+
+  void BLEManager::beginPeripheral()
+  {
+    instance = this;
+    Bluefruit.begin(QB_MAX_PRPH_CONNECTION, 0);
+    Bluefruit.setName("Qbead Peripheral");
+    setupPeripheral();
+    startBLEadv();
+  }
+
+  void BLEManager::startBLEadv(void)
+  {
+    Serial.println("[INFO]{BLE} Start advertising...");
+    // Advertising packet
+    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+    Bluefruit.Advertising.addTxPower();
+
+    // Include HRM Service UUID
+    Bluefruit.Advertising.addService(bleservice);
+
+    // Secondary Scan Response packet (optional)
+    // Since there is no room for 'Name' in Advertising packet
+    Bluefruit.ScanResponse.addName();
+
+    /* Start Advertising
+     * - Enable auto advertising if disconnected
+     * - Interval:  fast mode = 20 ms, slow mode = 152.5 ms
+     * - Timeout for fast mode is 30 seconds
+     * - Start(timeout) with timeout = 0 will advertise forever (until connected)
+     *
+     * For recommended advertising interval
+     * https://developer.apple.com/library/content/qa/qa1931/_index.html
+     */
+    Bluefruit.Advertising.restartOnDisconnect(true);
+    Bluefruit.Advertising.setInterval(32, 244); // in unit of 0.625 ms
+    Bluefruit.Advertising.setFastTimeout(30);   // number of seconds in fast mode
+    Bluefruit.Advertising.start(0);             // 0 = Don't stop advertising after n seconds
+  }
+
+  void BLEManager::beginCentral()
+  {
+    instance = this;
+    Serial.begin(9600);
+    Bluefruit.begin(0, 1);
+    Bluefruit.setName("Qbead Central");
+
+    setupCentral();
+
+    startBLEScan();
+  }
+
+  void BLEManager::beginDualRole()
+  {
+    instance = this;
+
+    Bluefruit.begin(1, 1);
+    Bluefruit.setName("Qbead Dual");
+
+    setupPeripheral();
+    setupCentral();
+
+    startBLEadv();
+    startBLEScan();
+  }
+
+  void BLEManager::startBLEScan(void)
+  {
+
+    // setup the scanner
+    /* Start Central Scanning
+     * - Enable auto scan if disconnected
+     * - Interval = 100 ms, window = 80 ms
+     * - Filter only accept bleuart service in advertising
+     * - Don't use active scan (used to retrieve the optional scan response adv packet)
+     * - Start(0) = will scan forever since no timeout is given
+     */
+    Bluefruit.Scanner.setRxCallback(scan_callback);
+    Bluefruit.Scanner.restartOnDisconnect(true);
+    Bluefruit.Scanner.setInterval(160, 80);               // in units of 0.625 ms
+    Bluefruit.Scanner.filterUuid(Qbead::QB_UUID_SERVICE); // this allows us to select a specific service
+    Bluefruit.Scanner.useActiveScan(false);               // Don't request scan response data
+    Bluefruit.Scanner.start(0);                           // 0 = Don't stop scanning after n seconds
+  }
+
+  void BLEManager::scan_callback(ble_gap_evt_adv_report_t *report)
+  {
+    // Since we configure the scanner with filterUuid()
+    // Scan callback only invoked for device with qbead service advertised
+    // Connect to the device with qbead service in advertising packet
+    Serial.println("Found Device!");
+    // Stop scanning
+    Bluefruit.Scanner.stop();
+
+    Bluefruit.Central.connect(report);
+  }
+
+  void BLEManager::connect_callback(uint16_t conn_handle)
+  {
+    if (instance == nullptr)
+      return;
+    Serial.println("Connected!");
+    // should not be required since we filter
+    if (!instance->qBeadClientService.discover(conn_handle))
+    {
+      Serial.println("Service NOT found");
+      Bluefruit.disconnect(conn_handle);
+      return;
+    }
+
+    Serial.println("Service found");
+
+    if (!instance->qBeadDataClient.discover())
+    {
+      Serial.println("Characteristic NOT found");
+      Bluefruit.disconnect(conn_handle);
+      return;
+    }
+
+    Serial.println("Characteristic found");
+
+    // Enable notifications if supported
+    if (instance->qBeadDataClient.properties() & CHR_PROPS_NOTIFY)
+    {
+      instance->qBeadDataClient.enableNotify();
+      Serial.println("Notifications enabled");
+    }
+  }
+
+  void BLEManager::data_callback(
+      BLEClientCharacteristic *chr,
+      uint8_t *data,
+      uint16_t len)
+  {
+    if (instance == nullptr || len != sizeof(DataPacket))
+    {
+      Serial.println("Unexpected packet length");
+      return;
+    }
+
+    DataPacket packet;
+    memcpy(&packet, data, sizeof(packet));
+    instance->lastPacket = packet;
+
+    // Entanglement requests are handled as a dedicated event, rather than
+    // relying on whichever packet happened to be received most recently.
+    // Otherwise it would be difficult to set precise timewindow for an attempt.
+    if (packet.type == CommandType::Entangle)
+    {
+      instance->entangleRequestReceivedAtMs = millis();
+      instance->entangleRequestPending = true;
+
+      Serial.println("[INFO]{BLE} Received entanglement request");
+    }
+  }
+
+  void BLEManager::disconnect_callback(uint16_t conn_handle, uint8_t reason)
+  {
+    Serial.println("Disconnected");
+    if (instance != nullptr)
+    {
+      instance->startBLEScan(); // restart scanning
+    }
+  }
+
+  void BLEManager::sendData(CommandType type, uint32_t value, uint32_t theta,
+                            uint32_t phi)
+  {
+    DataPacket packet = {type, value, theta, phi};
+
+    qBeadDataChar.write(&packet, sizeof(packet));
+
+    for (uint16_t conn = 0; conn < QB_MAX_PRPH_CONNECTION; conn++)
+    {
+      if (Bluefruit.connected(conn) &&
+          qBeadDataChar.notifyEnabled(conn))
+      {
+        qBeadDataChar.notify(&packet, sizeof(packet));
+      }
+    }
+  }
+
+} // namespace BLEManager
