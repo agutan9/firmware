@@ -26,7 +26,7 @@ namespace ChshComms
         uint32_t theta,
         uint32_t phi)
     {
-        bead.ble.sendData(
+        bead.sendData(
             type,
             value,
             theta,

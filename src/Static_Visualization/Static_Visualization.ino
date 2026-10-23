@@ -80,7 +80,7 @@ void measure()
     Serial.print(outcome);
     Serial.println(">");
 
-    bead.ble.sendData(
+    bead.sendData(
         BLEManager::CommandType::Measure,
         outcome,
         0,
